@@ -17,7 +17,7 @@ NumPy joue le même rôle qu'une bibliothèque de matrices comme Eigen en C++.
 
 ## Les performances viennent de l'algèbre linéaire, pas du langage
 
-L'entraînement d'un réseau dense passe l'essentiel de son temps dans des produits matriciels (`W @ X`). NumPy délègue ces calculs à une implémentation BLAS (OpenBLAS ou MKL), écrite en C, Fortran et assembleur, qui utilise :
+L'entraînement d'un réseau dense passe l'essentiel de son temps dans des produits matriciels (`X @ W`). NumPy délègue ces calculs à une implémentation BLAS (OpenBLAS ou MKL), écrite en C, Fortran et assembleur, qui utilise :
 
 - les instructions vectorielles SIMD ;
 - un découpage en blocs adapté au cache ;
@@ -40,7 +40,7 @@ Python permet d'itérer vite sur ces expériences. Les scripts d'entraînement, 
 
 ## Un code proche des formules mathématiques
 
-Avec NumPy, le code reste très proche des équations : `z = W @ x + b`, `dW = delta @ x.T`. Ce code est donc plus simple :
+Avec NumPy, le code reste très proche des équations : `Z = X @ W + b`, `dW = X.T @ delta`. Ce code est donc plus simple :
 
 - à relire ;
 - à vérifier par gradient checking (comparaison avec les différences finies) ;

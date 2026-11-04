@@ -17,3 +17,15 @@ class Dense:
         self.output_size = output_size
         self.weights = np.zeros((input_size, output_size))
         self.biases = np.zeros(output_size)
+        self.inputs = None
+        self.outputs = None
+
+    def forward(self, inputs: np.ndarray) -> np.ndarray:
+        """Compute the outputs of a batch of shape (batch_size, input_size)."""
+        if inputs.ndim != 2 or inputs.shape[1] != self.input_size:
+            raise MyTorchError(
+                f"expected a batch of shape (batch_size, {self.input_size}), got {inputs.shape}"
+            )
+        self.inputs = inputs
+        self.outputs = inputs @ self.weights + self.biases
+        return self.outputs
