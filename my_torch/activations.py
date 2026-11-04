@@ -59,3 +59,14 @@ class LeakyReLU(Activation):
 
     def derivative(self, z: np.ndarray) -> np.ndarray:
         return np.where(z > 0, 1.0, LEAKY_RELU_SLOPE)
+
+
+class Softmax(Activation):
+    def forward(self, z: np.ndarray) -> np.ndarray:
+        exponentials = np.exp(z - z.max(axis=1, keepdims=True))
+        return exponentials / exponentials.sum(axis=1, keepdims=True)
+
+    def backward(self, z: np.ndarray, gradient: np.ndarray) -> np.ndarray:
+        outputs = self.forward(z)
+        weighted_sum = (outputs * gradient).sum(axis=1, keepdims=True)
+        return outputs * (gradient - weighted_sum)
