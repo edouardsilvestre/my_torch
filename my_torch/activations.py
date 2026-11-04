@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from my_torch.errors import MyTorchError
+
 MAX_EXPONENT = 500.0
 LEAKY_RELU_SLOPE = 0.01
 
@@ -70,3 +72,22 @@ class Softmax(Activation):
         outputs = self.forward(z)
         weighted_sum = (outputs * gradient).sum(axis=1, keepdims=True)
         return outputs * (gradient - weighted_sum)
+
+
+ACTIVATIONS = {
+    "identity": Identity,
+    "sigmoid": Sigmoid,
+    "tanh": Tanh,
+    "relu": ReLU,
+    "leaky_relu": LeakyReLU,
+    "softmax": Softmax,
+}
+
+
+def get_activation(name: str) -> Activation:
+    """Return a new activation from its name."""
+    if name not in ACTIVATIONS:
+        raise MyTorchError(
+            f"unknown activation '{name}', expected one of: {', '.join(ACTIVATIONS)}"
+        )
+    return ACTIVATIONS[name]()
