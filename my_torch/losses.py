@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from my_torch.activations import Softmax
 from my_torch.errors import MyTorchError
 
 
@@ -32,3 +33,17 @@ class MSE(Loss):
     def backward(self, outputs: np.ndarray, targets: np.ndarray) -> np.ndarray:
         check_same_shape(outputs, targets)
         return 2.0 * (outputs - targets) / outputs.size
+
+
+class CrossEntropy(Loss):
+    """Categorical cross-entropy computed from the raw scores of the last layer."""
+
+    def forward(self, outputs: np.ndarray, targets: np.ndarray) -> float:
+        check_same_shape(outputs, targets)
+        shifted = outputs - outputs.max(axis=1, keepdims=True)
+        log_probabilities = shifted - np.log(np.exp(shifted).sum(axis=1, keepdims=True))
+        return float(-np.mean(np.sum(targets * log_probabilities, axis=1)))
+
+    def backward(self, outputs: np.ndarray, targets: np.ndarray) -> np.ndarray:
+        check_same_shape(outputs, targets)
+        return (Softmax().forward(outputs) - targets) / outputs.shape[0]
