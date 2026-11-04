@@ -3,6 +3,7 @@
 import numpy as np
 
 MAX_EXPONENT = 500.0
+LEAKY_RELU_SLOPE = 0.01
 
 
 class Activation:
@@ -42,3 +43,19 @@ class Tanh(Activation):
 
     def derivative(self, z: np.ndarray) -> np.ndarray:
         return 1.0 - np.tanh(z) ** 2
+
+
+class ReLU(Activation):
+    def forward(self, z: np.ndarray) -> np.ndarray:
+        return np.maximum(0.0, z)
+
+    def derivative(self, z: np.ndarray) -> np.ndarray:
+        return (z > 0).astype(float)
+
+
+class LeakyReLU(Activation):
+    def forward(self, z: np.ndarray) -> np.ndarray:
+        return np.where(z > 0, z, LEAKY_RELU_SLOPE * z)
+
+    def derivative(self, z: np.ndarray) -> np.ndarray:
+        return np.where(z > 0, 1.0, LEAKY_RELU_SLOPE)
