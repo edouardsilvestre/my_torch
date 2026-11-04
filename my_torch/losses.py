@@ -47,3 +47,18 @@ class CrossEntropy(Loss):
     def backward(self, outputs: np.ndarray, targets: np.ndarray) -> np.ndarray:
         check_same_shape(outputs, targets)
         return (Softmax().forward(outputs) - targets) / outputs.shape[0]
+
+
+LOSSES = {
+    "mse": MSE,
+    "cross_entropy": CrossEntropy,
+}
+
+
+def get_loss(name: str) -> Loss:
+    """Return a new loss from its name."""
+    if name not in LOSSES:
+        raise MyTorchError(
+            f"unknown loss '{name}', expected one of: {', '.join(LOSSES)}"
+        )
+    return LOSSES[name]()
