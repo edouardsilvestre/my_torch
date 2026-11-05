@@ -29,3 +29,7 @@ class Network:
         for layer, activation in zip(self.layers, self.activations):
             outputs = activation.forward(layer.forward(outputs))
         return outputs
+
+    def predict(self, inputs: np.ndarray) -> np.ndarray:
+        """Return the index of the highest score of each example of the batch."""
+        return np.argmax(self.forward(inputs), axis=1)
