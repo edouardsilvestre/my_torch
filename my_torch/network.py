@@ -1,5 +1,7 @@
 """Neural network assembled from dense layers and activations."""
 
+import numpy as np
+
 from my_torch.activations import get_activation
 from my_torch.errors import MyTorchError
 from my_torch.layers import Dense
@@ -20,3 +22,10 @@ class Network:
             self.layers.append(Dense(size, output_size))
             self.activations.append(get_activation(activation_name))
             size = output_size
+
+    def forward(self, inputs: np.ndarray) -> np.ndarray:
+        """Compute the outputs of the last layer for a batch of inputs."""
+        outputs = inputs
+        for layer, activation in zip(self.layers, self.activations):
+            outputs = activation.forward(layer.forward(outputs))
+        return outputs
