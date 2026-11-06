@@ -5,7 +5,7 @@ Run from the root of the repository: python3 -m scripts.xor_convergence
 
 import numpy as np
 
-from my_torch import Network, get_loss
+from my_torch import Network, get_loss, get_optimizer
 
 INPUTS = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
 LABELS = np.array([0, 1, 1, 0])
@@ -27,12 +27,11 @@ CONFIGURATIONS = [
 def train(architecture: list[tuple[int, str]], initializer: str, seed: int) -> tuple[bool, float]:
     """Train a network with a plain gradient descent, return its success and final loss."""
     loss = get_loss("cross_entropy")
+    optimizer = get_optimizer("sgd", learning_rate=LEARNING_RATE)
     network = Network(2, architecture, initializer, seed=seed)
     for _ in range(EPOCHS):
         network.backward(loss.backward(network.forward(INPUTS), TARGETS))
-        for layer in network.layers:
-            layer.weights -= LEARNING_RATE * layer.weights_gradient
-            layer.biases -= LEARNING_RATE * layer.biases_gradient
+        optimizer.step(network.layers)
     success = np.array_equal(network.predict(INPUTS), LABELS)
     return success, loss.forward(network.forward(INPUTS), TARGETS)
 
