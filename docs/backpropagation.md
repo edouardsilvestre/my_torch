@@ -30,15 +30,12 @@ Une étape d'apprentissage comporte quatre opérations :
 outputs = network.forward(inputs)            # 1. calcule les sorties
 gradient = loss.backward(outputs, targets)   # 2. gradient du coût par rapport aux sorties
 network.backward(gradient)                   # 3. remplit le gradient de chaque couche
-
-for layer in network.layers:                 # 4. met à jour les paramètres
-    layer.weights -= learning_rate * layer.weights_gradient
-    layer.biases -= learning_rate * layer.biases_gradient
+optimizer.step(network.layers)               # 4. met à jour les paramètres
 ```
 
-On retire le gradient, car il indique le sens dans lequel le coût **monte**.
+La mise à jour la plus simple retire à chaque paramètre son gradient, multiplié par le learning rate. On le retire, car il indique le sens dans lequel le coût **monte**.
 
-La backpropagation s'arrête à l'étape 3 : elle calcule les gradients, mais ne modifie aucun paramètre. Ici, l'étape 4 est la descente de gradient la plus simple. Séparer ces deux rôles permet de changer de méthode de mise à jour sans toucher à la backpropagation.
+La backpropagation s'arrête à l'étape 3 : elle calcule les gradients, mais ne modifie aucun paramètre. L'étape 4 revient à [l'optimiseur](optimiseurs.md). Séparer ces deux rôles permet de changer de méthode de mise à jour sans toucher à la backpropagation.
 
 ## La couche dense
 
@@ -140,7 +137,7 @@ Ces tests se lancent avec `make tests_run`.
 
 ## Résultats sur XOR
 
-XOR n'est pas séparable par une droite : il faut une couche cachée et une activation. Ce tableau donne le taux de réussite (les 4 réponses justes) sur 100 graines, avec une descente de gradient simple, 2000 epochs et un learning rate de 0,5. Il se reproduit depuis la racine du dépôt, en environ une minute, avec `python3 -m scripts.xor_convergence`.
+XOR n'est pas séparable par une droite : il faut une couche cachée et une activation. Ce tableau donne le taux de réussite (les 4 réponses justes) sur 100 graines, avec une descente de gradient simple, 2000 epochs et un learning rate de 0,5. Il se reproduit depuis la racine du dépôt, en une à deux minutes et demie, avec `python3 -m scripts.xor_convergence`.
 
 | Architecture | Réussite | Coût médian | Graines en échec |
 |---|---|---|---|

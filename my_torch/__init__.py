@@ -6,6 +6,7 @@ from my_torch.initializers import get_initializer
 from my_torch.layers import Dense
 from my_torch.losses import Loss, get_loss
 from my_torch.network import Network
+from my_torch.optimizers import Optimizer, get_optimizer
 
 __all__ = [
     "Activation",
@@ -13,7 +14,9 @@ __all__ = [
     "Loss",
     "MyTorchError",
     "Network",
+    "Optimizer",
     "get_activation",
     "get_initializer",
     "get_loss",
+    "get_optimizer",
 ]
