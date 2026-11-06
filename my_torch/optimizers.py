@@ -115,3 +115,23 @@ class Adam(Optimizer):
         corrected_mean = mean / (1 - self.beta1 ** self.steps)
         corrected_square = square / (1 - self.beta2 ** self.steps)
         return self.learning_rate * corrected_mean / (np.sqrt(corrected_square) + self.epsilon)
+
+
+OPTIMIZERS = {
+    "sgd": SGD,
+    "momentum": Momentum,
+    "rmsprop": RMSProp,
+    "adam": Adam,
+}
+
+
+def get_optimizer(name: str, **params: float | bool) -> Optimizer:
+    """Return a new optimizer from its name and its parameters."""
+    if name not in OPTIMIZERS:
+        raise MyTorchError(
+            f"unknown optimizer '{name}', expected one of: {', '.join(OPTIMIZERS)}"
+        )
+    try:
+        return OPTIMIZERS[name](**params)
+    except TypeError as error:
+        raise MyTorchError(f"invalid parameters for optimizer '{name}': {error}") from error
