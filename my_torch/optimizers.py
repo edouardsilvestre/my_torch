@@ -32,3 +32,24 @@ class SGD(Optimizer):
 
     def compute_update(self, key: tuple[int, str], gradient: np.ndarray) -> np.ndarray:
         return self.learning_rate * gradient
+
+
+class Momentum(Optimizer):
+    """Gradient descent with a velocity, and an optional Nesterov look-ahead."""
+
+    def __init__(
+        self, learning_rate: float = 0.01, momentum: float = 0.9, nesterov: bool = False
+    ) -> None:
+        super().__init__(learning_rate)
+        if not 0 <= momentum < 1:
+            raise MyTorchError(f"momentum must be in [0, 1[, got {momentum}")
+        self.momentum = momentum
+        self.nesterov = nesterov
+        self.velocities: dict[tuple[int, str], np.ndarray] = {}
+
+    def compute_update(self, key: tuple[int, str], gradient: np.ndarray) -> np.ndarray:
+        velocity = self.momentum * self.velocities.get(key, 0.0) + gradient
+        self.velocities[key] = velocity
+        if self.nesterov:
+            return self.learning_rate * (gradient + self.momentum * velocity)
+        return self.learning_rate * velocity
