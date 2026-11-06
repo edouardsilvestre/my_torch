@@ -56,3 +56,31 @@ def test_forward_remembers_inputs_and_outputs(layer):
 def test_forward_rejects_wrong_shape(layer, shape):
     with pytest.raises(MyTorchError):
         layer.forward(np.zeros(shape))
+
+
+def test_backward_matches_hand_computed_values(layer):
+    layer.forward(INPUTS)
+    input_gradient = layer.backward(np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
+    assert np.allclose(layer.weights_gradient, [[1.0, 3.0, 0.0], [2.0, 4.0, 0.0]])
+    assert np.allclose(layer.biases_gradient, [1.0, 1.0, 0.0])
+    assert np.allclose(input_gradient, [[1.0, 0.0], [0.0, 1.0]])
+
+
+def test_backward_output_shapes():
+    layer = Dense(768, 256)
+    layer.forward(np.zeros((5, 768)))
+    input_gradient = layer.backward(np.zeros((5, 256)))
+    assert layer.weights_gradient.shape == (768, 256)
+    assert layer.biases_gradient.shape == (256,)
+    assert input_gradient.shape == (5, 768)
+
+
+def test_backward_before_forward_raises():
+    with pytest.raises(MyTorchError, match="forward must be called"):
+        Dense(2, 3).backward(np.zeros((1, 3)))
+
+
+def test_backward_rejects_wrong_gradient_shape(layer):
+    layer.forward(INPUTS)
+    with pytest.raises(MyTorchError, match="expected a gradient"):
+        layer.backward(np.zeros((2, 2)))

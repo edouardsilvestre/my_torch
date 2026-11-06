@@ -44,3 +44,15 @@ class Network:
     def predict(self, inputs: np.ndarray) -> np.ndarray:
         """Return the index of the highest score of each example of the batch."""
         return np.argmax(self.forward(inputs), axis=1)
+
+    def backward(self, gradient: np.ndarray) -> None:
+        """Propagate the gradient of the loss back through every layer."""
+        last_outputs = self.layers[-1].outputs
+        if last_outputs is None:
+            raise MyTorchError("forward must be called before backward")
+        if gradient.shape != last_outputs.shape:
+            raise MyTorchError(
+                f"expected a gradient of shape {last_outputs.shape}, got {gradient.shape}"
+            )
+        for layer, activation in zip(reversed(self.layers), reversed(self.activations)):
+            gradient = layer.backward(activation.backward(layer.outputs, gradient))

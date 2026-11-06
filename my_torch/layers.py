@@ -19,6 +19,8 @@ class Dense:
         self.biases = np.zeros(output_size)
         self.inputs = None
         self.outputs = None
+        self.weights_gradient = None
+        self.biases_gradient = None
 
     def forward(self, inputs: np.ndarray) -> np.ndarray:
         """Compute the outputs of a batch of shape (batch_size, input_size)."""
@@ -29,3 +31,15 @@ class Dense:
         self.inputs = inputs
         self.outputs = inputs @ self.weights + self.biases
         return self.outputs
+
+    def backward(self, gradient: np.ndarray) -> np.ndarray:
+        """Store the gradients of W and b, and return the gradient of the inputs."""
+        if self.outputs is None:
+            raise MyTorchError("forward must be called before backward")
+        if gradient.shape != self.outputs.shape:
+            raise MyTorchError(
+                f"expected a gradient of shape {self.outputs.shape}, got {gradient.shape}"
+            )
+        self.weights_gradient = self.inputs.T @ gradient
+        self.biases_gradient = gradient.sum(axis=0)
+        return gradient @ self.weights.T
