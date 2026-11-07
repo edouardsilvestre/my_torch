@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from my_torch import Dense, MyTorchError, Network, Optimizer, get_optimizer
-from my_torch.optimizers import SGD, Adam, Momentum, RMSProp
+from my_torch import Dense, MyTorchError, Network, Optimizer, get_loss, get_optimizer
+from my_torch.optimizers import SGD, Adam, Momentum, RMSProp, optimizer_name
 
 ALL_OPTIMIZERS = [
     ("sgd", {}),
@@ -254,3 +254,146 @@ def test_non_numeric_value_raises_an_error(name, parameter, value):
 def test_base_class_does_not_compute_updates():
     with pytest.raises(NotImplementedError):
         Optimizer().compute_update((0, "weights"), np.zeros((1, 1)))
+
+
+def trained_optimizer(name, params=None, epochs=3):
+    """Return an optimizer and the network it trained on XOR for a few epochs."""
+    network = Network(2, [(4, "tanh"), (2, "identity")], seed=1)
+    optimizer = get_optimizer(name, **(params or {}))
+    inputs = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
+    targets = np.eye(2)[[0, 1, 1, 0]]
+    loss = get_loss("cross_entropy")
+    for _ in range(epochs):
+        network.backward(loss.backward(network.forward(inputs), targets))
+        optimizer.step(network.layers)
+    return optimizer, network
+
+
+@pytest.mark.parametrize("name, params, expected", [
+    ("sgd", {"learning_rate": 0.3}, {"learning_rate": 0.3}),
+    ("momentum", {"momentum": 0.8, "nesterov": True},
+     {"learning_rate": 0.01, "momentum": 0.8, "nesterov": True}),
+    ("rmsprop", {"decay": 0.5}, {"learning_rate": 0.001, "decay": 0.5, "epsilon": 1e-8}),
+    ("adam", {"beta2": 0.99},
+     {"learning_rate": 0.001, "beta1": 0.9, "beta2": 0.99, "epsilon": 1e-8}),
+])
+def test_hyperparameters_create_the_same_optimizer_again(name, params, expected):
+    optimizer = get_optimizer(name, **params)
+    assert optimizer.hyperparameters() == expected
+    assert optimizer_name(optimizer) == name
+    assert get_optimizer(name, **expected).hyperparameters() == expected
+
+
+@pytest.mark.parametrize("name, expected_keys", [
+    ("sgd", set()),
+    ("momentum", {f"velocities/{i}/{p}" for i in (0, 1) for p in ("weights", "biases")}),
+    ("rmsprop", {f"squares/{i}/{p}" for i in (0, 1) for p in ("weights", "biases")}),
+    ("adam", {f"{k}/{i}/{p}" for k in ("means", "squares") for i in (0, 1)
+              for p in ("weights", "biases")} | {"steps"}),
+])
+def test_state_names_every_memory(name, expected_keys):
+    optimizer, _ = trained_optimizer(name)
+    assert set(optimizer.state()) == expected_keys
+
+
+@pytest.mark.parametrize("name, params", ALL_OPTIMIZERS)
+def test_restored_state_continues_exactly(name, params):
+    reference, reference_network = trained_optimizer(name, params, epochs=6)
+    optimizer, network = trained_optimizer(name, params, epochs=3)
+    restored = get_optimizer(optimizer_name(optimizer), **optimizer.hyperparameters())
+    restored.load_state({key: array.copy() for key, array in optimizer.state().items()},
+                        network.layers)
+    inputs = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
+    targets = np.eye(2)[[0, 1, 1, 0]]
+    loss = get_loss("cross_entropy")
+    for _ in range(3):
+        network.backward(loss.backward(network.forward(inputs), targets))
+        restored.step(network.layers)
+    for expected, layer in zip(reference_network.layers, network.layers):
+        assert np.array_equal(expected.weights, layer.weights)
+        assert np.array_equal(expected.biases, layer.biases)
+
+
+def test_loaded_state_is_a_copy():
+    optimizer, network = trained_optimizer("momentum")
+    state = {key: array.copy() for key, array in optimizer.state().items()}
+    restored = get_optimizer("momentum")
+    restored.load_state(state, network.layers)
+    state["velocities/0/weights"][0, 0] = 99.0
+    assert restored.velocities[(0, "weights")][0, 0] != 99.0
+
+
+def momentum_state_with(key, array=None):
+    optimizer, network = trained_optimizer("momentum")
+    state = optimizer.state()
+    state[key] = state["velocities/0/weights"] if array is None else array
+    return state, network
+
+
+@pytest.mark.parametrize("key, array", [
+    ("velocities/9/weights", None),
+    ("velocities/-1/weights", None),
+    ("velocities/a/weights", None),
+    ("velocities/0/kernel", None),
+    ("velocities/0", None),
+    ("means/0/weights", None),
+    ("velocities/0/weights", np.zeros((1, 4))),
+    ("velocities/0/weights", np.zeros((2, 4), dtype=int)),
+    ("velocities/0/weights", np.full((2, 4), np.nan)),
+    ("velocities/0/weights", [[0.0] * 4] * 2),
+])
+def test_invalid_state_is_rejected_and_changes_nothing(key, array):
+    state, network = momentum_state_with(key, array)
+    optimizer, _ = trained_optimizer("momentum", epochs=1)
+    before = {key: value.copy() for key, value in optimizer.state().items()}
+    with pytest.raises(MyTorchError):
+        optimizer.load_state(state, network.layers)
+    after = optimizer.state()
+    assert before.keys() == after.keys()
+    assert all(np.array_equal(before[key], after[key]) for key in before)
+
+
+def test_state_given_to_sgd_is_rejected():
+    optimizer, network = trained_optimizer("momentum")
+    with pytest.raises(MyTorchError):
+        get_optimizer("sgd").load_state(optimizer.state(), network.layers)
+
+
+@pytest.mark.parametrize("name", ["rmsprop", "adam"])
+def test_negative_squares_are_rejected(name):
+    optimizer, network = trained_optimizer(name)
+    state = optimizer.state()
+    state["squares/0/weights"] = -np.ones_like(state["squares/0/weights"])
+    with pytest.raises(MyTorchError):
+        get_optimizer(name).load_state(state, network.layers)
+
+
+@pytest.mark.parametrize("change", [
+    lambda state: state.pop("steps"),
+    lambda state: state.update(steps=np.array(-1)),
+    lambda state: state.update(steps=np.array(2.0)),
+    lambda state: state.update(steps=np.array([2])),
+    lambda state: state.update(steps=np.array(0)),
+    lambda state: state.pop("squares/0/weights"),
+])
+def test_inconsistent_adam_state_is_rejected(change):
+    optimizer, network = trained_optimizer("adam")
+    state = optimizer.state()
+    change(state)
+    with pytest.raises(MyTorchError):
+        get_optimizer("adam").load_state(state, network.layers)
+
+
+def test_fresh_states_can_be_restored():
+    network = Network(2, [(2, "identity")])
+    for name, params in ALL_OPTIMIZERS:
+        get_optimizer(name, **params).load_state(get_optimizer(name, **params).state(),
+                                                 network.layers)
+
+
+def test_unknown_optimizer_class_has_no_name():
+    class Custom(SGD):
+        pass
+
+    with pytest.raises(MyTorchError):
+        optimizer_name(Custom())
