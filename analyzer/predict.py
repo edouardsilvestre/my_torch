@@ -14,15 +14,20 @@ from my_torch import Network, load_network
 PREDICTION_BATCH_SIZE = 1024
 
 
-def load_chess_network(path: str) -> tuple[Network, tuple[str, ...]]:
-    """Load a network, and check that it reads encoded chessboards and predicts labels."""
-    network = load_network(path).network
+def check_chess_network(network: Network) -> tuple[str, ...]:
+    """Check that a network reads encoded chessboards, and return the classes it predicts."""
     if network.input_size != INPUT_SIZE:
         raise AnalyzerError(
             f"network expects {network.input_size} inputs, "
             f"but chessboards are encoded with {INPUT_SIZE}"
         )
-    return network, get_classes(network.architecture[-1][0])
+    return get_classes(network.architecture[-1][0])
+
+
+def load_chess_network(path: str) -> tuple[Network, tuple[str, ...]]:
+    """Load a network, and check that it reads encoded chessboards and predicts labels."""
+    network = load_network(path).network
+    return network, check_chess_network(network)
 
 
 def predict_classes(network: Network, inputs: np.ndarray) -> np.ndarray:

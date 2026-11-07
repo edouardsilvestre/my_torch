@@ -1,6 +1,8 @@
 """Tests of the real executables, run as separate processes."""
 
+import select
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 
@@ -155,3 +157,88 @@ def test_predict_into_a_pipe_closed_before_any_output(generated_network):
     process.stderr.close()
     assert process.wait() == 0
     assert error_output == ""
+
+
+TRAINING_CONFIG = """[network]
+input_size = 769
+layers = [{ size = 32, activation = "relu" }, { size = 5, activation = "identity" }]
+seed = 0
+
+[training]
+loss = "cross_entropy"
+epochs = EPOCHS
+batch_size = 5
+seed = 0
+
+[optimizer]
+name = "adam"
+learning_rate = 0.01
+"""
+SUBJECT_LABELS = ["Checkmate Black", "Nothing", "Nothing", "Check White", "Nothing"]
+
+
+def prepare_training(directory, epochs):
+    (directory / "colors.conf").write_text(TRAINING_CONFIG.replace("EPOCHS", str(epochs)))
+    assert run_binary(GENERATOR, directory, "colors.conf", "1").returncode == 0
+    lines = [f"{fen} {label}" for fen, label in zip(SUBJECT_FENS, SUBJECT_LABELS)]
+    (directory / "train.txt").write_text("\n".join(lines) + "\n")
+    (directory / "boards.txt").write_text("\n".join(SUBJECT_FENS) + "\n")
+
+
+def test_generate_train_then_predict(tmp_path):
+    prepare_training(tmp_path, 100)
+    trained = run_binary(ANALYZER, tmp_path, "--train", "--save", "trained.nn", "colors_1.nn",
+                         "train.txt")
+    assert trained.returncode == 0
+    assert trained.stderr == ""
+    assert len(trained.stdout.splitlines()) == 100
+    predicted = run_binary(ANALYZER, tmp_path, "--predict", "trained.nn", "boards.txt")
+    assert predicted.returncode == 0
+    assert predicted.stdout.splitlines() == SUBJECT_LABELS
+
+
+@pytest.mark.parametrize("arguments", [
+    ("--train", "colors_1.nn", "train.txt"),
+    ("--train", "--save", "trained.nn", "colors_1.nn", "train.txt"),
+])
+def test_ctrl_c_during_training(tmp_path, arguments):
+    prepare_training(tmp_path, 1000000)
+    original = (tmp_path / "colors_1.nn").read_bytes()
+    process = subprocess.Popen([ANALYZER, *arguments], cwd=tmp_path, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, text=True)
+    try:
+        ready, _, _ = select.select([process.stdout], [], [], 30)
+        assert ready, "no progress line within 30 seconds"
+        assert process.stdout.readline().startswith("epoch")
+        process.send_signal(signal.SIGINT)
+        _, error_output = process.communicate(timeout=60)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.communicate()
+    assert process.returncode == 84
+    assert error_output == "my_torch_analyzer: interrupted, nothing was saved\n"
+    assert (tmp_path / "colors_1.nn").read_bytes() == original
+    assert not (tmp_path / "trained.nn").exists()
+    assert not [path for path in tmp_path.iterdir() if path.name.startswith(".")]
+
+
+def test_training_into_a_closed_pipe_is_an_error(tmp_path):
+    prepare_training(tmp_path, 200)
+    original = (tmp_path / "colors_1.nn").read_bytes()
+    process = subprocess.Popen([ANALYZER, "--train", "colors_1.nn", "train.txt"], cwd=tmp_path,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        assert process.stdout.readline().startswith("epoch")
+        process.stdout.close()
+        error_output = process.stderr.read()
+        process.stderr.close()
+        assert process.wait(timeout=60) == 84
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+    assert error_output == (
+        "my_torch_analyzer: the standard output was closed during training, nothing was saved\n"
+    )
+    assert (tmp_path / "colors_1.nn").read_bytes() == original

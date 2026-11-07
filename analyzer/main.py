@@ -6,6 +6,7 @@ import sys
 from analyzer.arguments import PREDICT, USAGE, UsageError, check_files, parse_arguments
 from analyzer.errors import AnalyzerError
 from analyzer.predict import predict
+from analyzer.train import run_training
 from my_torch import MyTorchError
 
 EXIT_SUCCESS = 0
@@ -22,7 +23,13 @@ def run(argv: list[str]) -> None:
     if arguments.mode == PREDICT:
         predict(arguments)
         return
-    raise AnalyzerError(f"--{arguments.mode} is not available yet")
+    try:
+        run_training(arguments)
+    except BrokenPipeError as error:
+        silence_standard_output()
+        raise AnalyzerError(
+            "the standard output was closed during training, nothing was saved"
+        ) from error
 
 
 def silence_standard_output() -> None:
@@ -43,6 +50,9 @@ def main(argv: list[str]) -> int:
     except BrokenPipeError:
         silence_standard_output()
         return EXIT_SUCCESS
+    except KeyboardInterrupt:
+        print("my_torch_analyzer: interrupted, nothing was saved", file=sys.stderr)
+        return EXIT_ERROR
     except Exception as error:
         print(f"my_torch_analyzer: unexpected error: {error}", file=sys.stderr)
         return EXIT_ERROR
