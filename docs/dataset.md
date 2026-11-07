@@ -96,6 +96,28 @@ Une partie s'arrête au mat, au pat, ou après 300 demi-coups.
 
 Sur le dataset de 1 500 positions ci-dessus, le nombre moyen de pièces est presque le même dans chaque classe, entre 18,6 et 21. Le réseau ne peut donc pas deviner un mat en comptant les pièces.
 
+## Le dataset fourni avec le sujet
+
+Le sujet est accompagné d'une archive, `dataset.zip`, qui contient 723 019 positions labellisées dans le même format, avec les couleurs. Elles sont rangées par état (`nothing`, `check`, `checkmate`) et par nombre de pièces (10, 20 ou davantage), et viennent de vraies parties. C'est sur elles qu'est entraîné [le réseau pré-entraîné](reseau_final.md), car elles ressemblent à celles du correcteur.
+
+```
+$> python3 -m scripts.prepare_official_dataset --archive dataset.zip --output datasets/official.txt
+```
+
+[scripts/prepare_official_dataset.py](../scripts/prepare_official_dataset.py) lit l'archive sans la décompresser, vérifie chaque ligne, et rassemble les 9 fichiers dans un seul, dans l'ordre de leurs noms. Une ligne invalide arrête le script, en citant le fichier et la ligne. L'archive n'est pas poussée, et elle est ignorée par git : tout le monde la reçoit avec le sujet.
+
+| Label | Positions | Part |
+|---|---|---|
+| `Nothing` | 300 000 | 41,5 % |
+| `Check White` | 135 587 | 18,8 % |
+| `Check Black` | 113 713 | 15,7 % |
+| `Checkmate White` | 94 295 | 13,0 % |
+| `Checkmate Black` | 79 424 | 11,0 % |
+
+Cette répartition est gardée telle quelle, sans rééquilibrage : elle reflète probablement mieux celle du correcteur qu'un tiers de chaque état. 7 460 positions y apparaissent deux fois. Elles sont retirées au moment du découpage.
+
+**Une vérification de nos règles.** Sur 18 000 positions tirées de ce dataset, 2 000 par fichier, nos [règles des échecs](#des-règles-des-échecs-écrites-pour-loccasion) donnent exactement le même label, couleur comprise. Cela confirme à la fois nos règles et notre sens de la couleur.
+
 ## Découper le dataset
 
 Pour savoir si le réseau a vraiment appris, il faut le tester sur des positions **qu'il n'a jamais vues**. Le dataset est donc découpé en trois parties :
@@ -135,8 +157,9 @@ Chaque ligne doit avoir un label valide. Sinon, le script s'arrête en citant le
 
 - [tests/test_perft.py](../tests/test_perft.py) vérifie les totaux perft de référence, le roque, la prise en passant, la promotion et les clouages.
 - [tests/test_dataset.py](../tests/test_dataset.py) vérifie les labels de positions connues, l'équilibre des classes, l'absence de doublons, la reproductibilité au bit près, et que chaque ligne générée a bien le label donné par les règles. Des parties préparées à l'avance garantissent que les cas rares, comme une position revue ou illégale, sont bien testés.
+- [tests/test_official_dataset.py](../tests/test_official_dataset.py) vérifie la préparation du dataset fourni, avec une petite archive construite dans le test.
 - [tests/test_split.py](../tests/test_split.py) vérifie les proportions de chaque label dans les trois parties, qu'elles sont disjointes et contiennent toutes les lignes, que la graine choisit quelles positions vont dans chaque partie, et le retrait des doublons.
 
-Pour vérifier les tests eux-mêmes, 50 erreurs ont été introduites volontairement dans les règles, la labellisation, la génération et le découpage, et chacune a fait échouer au moins un test.
+Pour vérifier les tests eux-mêmes, 64 erreurs ont été introduites volontairement dans les règles, la labellisation, la génération, la préparation du dataset fourni et le découpage, et chacune a fait échouer au moins un test.
 
 Ces tests se lancent avec `make tests_run`.
