@@ -23,3 +23,6 @@ my_torch-project.pdf
 *.swp
 *~
 .DS_Store
+
+# Dataset given with the subject (read by scripts/prepare_official_dataset.py)
+/dataset.zip
