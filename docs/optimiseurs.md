@@ -38,7 +38,7 @@ mise à jour = learning_rate × gradient
 
 C'est la descente de gradient la plus simple. Le learning rate règle la taille du pas : trop grand, le coût peut osciller ou diverger ; trop petit, l'apprentissage est très lent.
 
-Ici, le gradient est calculé sur le batch reçu : le choix entre batch complet, mini-batch et stochastique revient à la boucle d'entraînement.
+Ici, le gradient est calculé sur le batch reçu : le choix entre batch complet, mini-batch et stochastique revient à la [boucle d'entraînement](entrainement.md).
 
 ## Momentum
 
@@ -152,7 +152,7 @@ Ces valeurs par défaut sont des points de départ courants. Celles d'Adam vienn
 
 ## Le learning rate
 
-Ces tableaux se reproduisent depuis la racine du dépôt, en quelques minutes, avec `python3 -m scripts.optimizer_learning_rates`. Ils portent sur les problèmes jouets des tests : une régression `y = 2a - 3b + 1` avec une couche linéaire et MSE, et XOR avec 4 neurones `tanh` et la cross-entropy. Le momentum vaut `0.9`.
+Ces tableaux se reproduisent depuis la racine du dépôt, en cinq minutes environ, avec `python3 -m scripts.optimizer_learning_rates`. Ils portent sur les problèmes jouets des tests : une régression `y = 2a - 3b + 1` avec une couche linéaire et MSE, et XOR avec 4 neurones `tanh` et la cross-entropy. Le momentum vaut `0.9`.
 
 **Régression, 500 pas, graine 0 :**
 
