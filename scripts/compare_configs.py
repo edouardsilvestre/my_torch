@@ -21,6 +21,15 @@ from analyzer.train import read_training_data
 from my_torch import MyTorchError, load_config, train
 
 
+def kept_epoch(history: dict, patience: int | None, monitor: str) -> int:
+    """The epoch whose weights the network keeps: the last one, or the best one with early
+    stopping. The first of equal values is the best, as in train()."""
+    if patience is None:
+        return len(history[monitor])
+    choose = np.argmin if monitor == "val_loss" else np.argmax
+    return int(choose(history[monitor])) + 1
+
+
 def compare(config_path: Path, train_path: str, validation_path: str, cache: dict) -> dict:
     """Train the network of a configuration, and measure it on the validation set."""
     config = load_config(config_path)
@@ -44,7 +53,8 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
     return {
         "config": str(config_path),
         "seconds": seconds,
-        "train_accuracy": history["accuracy"][-1],
+        "kept_epoch": (kept := kept_epoch(history, config.patience, config.monitor)),
+        "train_accuracy": history["accuracy"][kept - 1],
         "validation_accuracy": {len(level.classes): level.metrics.accuracy for level in levels},
         "validation_macro_f1": levels[0].metrics.macro.f1,
         "best_epoch": best_epoch,
@@ -55,15 +65,16 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
 
 def format_table(results: list[dict]) -> str:
     lines = [
-        "| Configuration | Train acc. | Val. acc. 5 | Val. acc. 3 | Val. acc. 2 "
+        "| Configuration | Kept epoch | Train acc. | Val. acc. 5 | Val. acc. 3 | Val. acc. 2 "
         "| Val. macro F1 | Best epoch (val. acc.) | Time |",
-        "|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for result in results:
         accuracy = result["validation_accuracy"]
         cells = [f"{accuracy[size]:.4f}" if size in accuracy else "-" for size in (5, 3, 2)]
         lines.append(
-            f"| {Path(result['config']).stem} | {result['train_accuracy']:.4f} | "
+            f"| {Path(result['config']).stem} | {result['kept_epoch']} | "
+            f"{result['train_accuracy']:.4f} | "
             f"{' | '.join(cells)} | {result['validation_macro_f1']:.4f} | "
             f"{result['best_epoch']} ({result['best_validation_accuracy']:.4f}) | "
             f"{result['seconds'] / 60:.1f} min |"
