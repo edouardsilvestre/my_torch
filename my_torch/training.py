@@ -29,6 +29,11 @@ def check_count(name: str, value: int) -> None:
         raise MyTorchError(f"{name} must be a positive integer, got {value!r}")
 
 
+def check_l2(value: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value < np.inf:
+        raise MyTorchError(f"l2 must be a non-negative number, got {value!r}")
+
+
 def is_one_hot(targets: np.ndarray) -> bool:
     """Tell whether each row of the targets holds a single 1 and zeros elsewhere."""
     return (
@@ -75,8 +80,13 @@ def train(
     seed: int | None = None,
     validation: tuple[np.ndarray, np.ndarray] | None = None,
     verbose: bool = False,
+    l2: float = 0.0,
 ) -> dict[str, list[float]]:
     """Train a network on a dataset, with one optimizer step per batch.
+
+    With l2, the loss gets a penalty l2 / 2 times the sum of the squared weights, which
+    pushes the weights towards 0: l2 times the weights is added to their gradient. The
+    biases are not penalised, and the history reports the loss of the data alone.
 
     Return the history of the metrics measured at the end of each epoch.
     """
@@ -87,6 +97,7 @@ def train(
         check_dataset("validation", *validation)
     check_count("epochs", epochs)
     check_count("batch_size", batch_size)
+    check_l2(l2)
     rng = np.random.default_rng(seed)
     history: dict[str, list[float]] = {}
     for epoch in range(1, epochs + 1):
@@ -95,6 +106,9 @@ def train(
             batch = order[start:start + batch_size]
             outputs = network.forward(inputs[batch])
             network.backward(loss.backward(outputs, targets[batch]))
+            if l2:
+                for layer in network.layers:
+                    layer.weights_gradient += l2 * layer.weights
             optimizer.step(network.layers)
         metrics = evaluate(network, loss, inputs, targets)
         if validation is not None:
