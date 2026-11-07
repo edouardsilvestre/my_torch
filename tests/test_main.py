@@ -2,6 +2,7 @@
 
 import pytest
 
+from analyzer.arguments import USAGE
 from analyzer.errors import AnalyzerError
 from analyzer.main import main
 from my_torch import MyTorchError
@@ -13,10 +14,10 @@ def failing_run(error):
     return run
 
 
-def test_success_returns_0_and_prints_nothing(capsys):
-    assert main([]) == 0
+def test_success_returns_0_and_writes_nothing_on_the_error_output(capsys):
+    assert main(["--help"]) == 0
     captured = capsys.readouterr()
-    assert captured.out == ""
+    assert captured.out == USAGE + "\n"
     assert captured.err == ""
 
 

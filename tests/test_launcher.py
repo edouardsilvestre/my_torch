@@ -16,9 +16,9 @@ def run_binary(binary, cwd, *arguments):
 
 
 def test_binary_runs_from_another_directory(tmp_path):
-    result = run_binary(ANALYZER, tmp_path)
+    result = run_binary(ANALYZER, tmp_path, "--help")
     assert result.returncode == 0
-    assert result.stdout == ""
+    assert result.stdout.startswith("USAGE\n        ./my_torch_analyzer [--predict")
     assert result.stderr == ""
 
 
