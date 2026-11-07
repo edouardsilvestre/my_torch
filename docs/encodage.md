@@ -70,7 +70,7 @@ Par exemple, dans la position initiale, le roi blanc en e1 est l'entrée `5 × 6
 | Information | Pourquoi |
 |---|---|
 | Les roques | Ils ne changent jamais l'état d'échec, et on ne peut pas roquer pour sortir d'un échec |
-| La prise en passant | Elle peut, très rarement, être la seule parade à un mat. C'est **une limite connue** : elle pourra être ajoutée si les mesures montrent que ces positions comptent |
+| La prise en passant | Elle peut, très rarement, être la seule parade à un mat. C'est **une limite connue** : elle pourra être ajoutée si les mesures montrent que ces positions comptent. [La génération du dataset](dataset.md) en donne un exemple concret |
 | Les deux compteurs | Ils n'ont aucun effet sur l'échec et le mat |
 
 Ces champs sont tout de même lus et vérifiés, pour refuser un FEN mal formé.
