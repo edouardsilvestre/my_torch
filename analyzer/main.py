@@ -2,8 +2,9 @@
 
 import sys
 
-from analyzer.arguments import USAGE, UsageError, check_files, parse_arguments
+from analyzer.arguments import PREDICT, USAGE, UsageError, check_files, parse_arguments
 from analyzer.errors import AnalyzerError
+from analyzer.predict import predict
 from my_torch import MyTorchError
 
 EXIT_SUCCESS = 0
@@ -17,6 +18,9 @@ def run(argv: list[str]) -> None:
         return
     arguments = parse_arguments(argv)
     check_files(arguments)
+    if arguments.mode == PREDICT:
+        predict(arguments)
+        return
     raise AnalyzerError(f"--{arguments.mode} is not available yet")
 
 
