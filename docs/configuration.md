@@ -27,7 +27,7 @@ name = "sgd"
 learning_rate = 0.5
 ```
 
-Le dépôt contient aussi [configs/basic_network.conf](../configs/basic_network.conf), un premier réseau pour les échiquiers. Sa taille d'entrée, 769, est celle de [l'encodage de l'échiquier](encodage.md). Il reste **provisoire** : son nombre de sorties dépend des labels retenus, et ses réglages ne sont pas encore mesurés.
+Le dépôt contient aussi [configs/basic_network.conf](../configs/basic_network.conf), un premier réseau pour les échiquiers à 3 sorties, et [configs/my_torch_network.conf](../configs/my_torch_network.conf), la configuration du réseau poussé, choisie parmi les candidates de [configs/candidates/](../configs/candidates) comme l'explique [le réseau pré-entraîné](reseau_final.md). Leur taille d'entrée, 769, est celle de [l'encodage de l'échiquier](encodage.md).
 
 ## Pourquoi TOML
 
