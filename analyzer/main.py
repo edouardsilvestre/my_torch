@@ -44,6 +44,9 @@ def main(argv: list[str]) -> int:
     except BrokenPipeError:
         silence_standard_output()
         return EXIT_SUCCESS
+    except KeyboardInterrupt:
+        print("my_torch_analyzer: interrupted, nothing was saved", file=sys.stderr)
+        return EXIT_ERROR
     except Exception as error:
         print(f"my_torch_analyzer: unexpected error: {error}", file=sys.stderr)
         return EXIT_ERROR
