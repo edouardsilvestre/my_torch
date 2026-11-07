@@ -22,8 +22,14 @@ def run(argv: list[str]) -> None:
     check_files(arguments)
     if arguments.mode == PREDICT:
         predict(arguments)
-    else:
+        return
+    try:
         run_training(arguments)
+    except BrokenPipeError as error:
+        silence_standard_output()
+        raise AnalyzerError(
+            "the standard output was closed during training, nothing was saved"
+        ) from error
 
 
 def silence_standard_output() -> None:

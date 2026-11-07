@@ -221,3 +221,24 @@ def test_ctrl_c_during_training(tmp_path, arguments):
     assert (tmp_path / "colors_1.nn").read_bytes() == original
     assert not (tmp_path / "trained.nn").exists()
     assert not [path for path in tmp_path.iterdir() if path.name.startswith(".")]
+
+
+def test_training_into_a_closed_pipe_is_an_error(tmp_path):
+    prepare_training(tmp_path, 200)
+    original = (tmp_path / "colors_1.nn").read_bytes()
+    process = subprocess.Popen([ANALYZER, "--train", "colors_1.nn", "train.txt"], cwd=tmp_path,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        assert process.stdout.readline().startswith("epoch")
+        process.stdout.close()
+        error_output = process.stderr.read()
+        process.stderr.close()
+        assert process.wait(timeout=60) == 84
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+    assert error_output == (
+        "my_torch_analyzer: the standard output was closed during training, nothing was saved\n"
+    )
+    assert (tmp_path / "colors_1.nn").read_bytes() == original

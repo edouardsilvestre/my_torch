@@ -175,3 +175,17 @@ def test_interruption_during_prediction(workdir, capsys, monkeypatch):
 def test_errors_are_raised_as_analyzer_errors(workdir):
     with pytest.raises(AnalyzerError):
         read_training_data("boards.txt", ("Nothing", "Check"))
+
+
+def test_closed_output_during_training_is_an_error(workdir, capsys, monkeypatch):
+    def closed_output(*args, **kwargs):
+        raise BrokenPipeError(32, "Broken pipe")
+
+    original = (workdir / "net5.nn").read_bytes()
+    monkeypatch.setattr(training, "train", closed_output)
+    monkeypatch.setattr("analyzer.main.silence_standard_output", lambda: None)
+    assert main(["--train", "net5.nn", "train.txt"]) == 84
+    assert capsys.readouterr().err == (
+        "my_torch_analyzer: the standard output was closed during training, nothing was saved\n"
+    )
+    assert (workdir / "net5.nn").read_bytes() == original
