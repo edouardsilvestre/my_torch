@@ -1,6 +1,6 @@
 # La génération du dataset
 
-Pour apprendre, le réseau a besoin de milliers de positions **avec leur bonne réponse**. Ce document explique comment le dépôt les produit, et comment refaire exactement le même dataset.
+Pour apprendre, le réseau a besoin de milliers de positions **avec leur bonne réponse**. Ce document explique comment le dépôt les produit, comment refaire exactement le même dataset, et comment le découper pour mesurer honnêtement la précision.
 
 ## Générer un dataset
 
@@ -96,6 +96,35 @@ Une partie s'arrête au mat, au pat, ou après 300 demi-coups.
 
 Sur le dataset de 1 500 positions ci-dessus, le nombre moyen de pièces est presque le même dans chaque classe, entre 18,6 et 21. Le réseau ne peut donc pas deviner un mat en comptant les pièces.
 
+## Découper le dataset
+
+Pour savoir si le réseau a vraiment appris, il faut le tester sur des positions **qu'il n'a jamais vues**. Le dataset est donc découpé en trois parties :
+
+| Partie | Part par défaut | Rôle |
+|---|---|---|
+| Entraînement | 80 % | Le réseau apprend dessus |
+| Validation | 10 % | Choisir les réglages : architecture, learning rate, nombre d'epochs |
+| Test | 10 % | Mesurer la précision finale, une seule fois, à la fin |
+
+```
+$> python3 -m scripts.split_dataset --input datasets/all.txt --ratios 80:10:10 --seed 0
+datasets/all_train.txt: 1200 positions (Nothing 400, Check White 200, Check Black 200, Checkmate White 200, Checkmate Black 200)
+datasets/all_validation.txt: 150 positions (Nothing 50, Check White 25, Check Black 25, Checkmate White 25, Checkmate Black 25)
+datasets/all_test.txt: 150 positions (Nothing 50, Check White 25, Check Black 25, Checkmate White 25, Checkmate Black 25)
+```
+
+Les trois fichiers sont écrits à côté du dataset d'origine, au même format : `--train` et `--predict` les lisent directement.
+
+**Le jeu de test ne sert jamais à choisir.** Si l'on choisissait les réglages d'après le jeu de test, on finirait par garder ceux qui marchent par chance sur ces positions-là. Il deviendrait indirectement une donnée d'apprentissage, et la précision mesurée dessus serait trop optimiste. Les choix se font donc sur le jeu de validation, et le test ne sert qu'à la mesure finale. Aucun programme ne peut imposer cette règle, puisqu'il ne sait pas à quoi sert un fichier : elle est écrite ici, et les outils de recherche de réglages utiliseront le jeu de validation.
+
+[dataset/split.py](../dataset/split.py) découpe le dataset ainsi :
+
+- **Label par label.** Chaque label, couleur comprise, est découpé séparément selon les mêmes parts. Les trois parties ont donc les mêmes proportions de chaque label. Une part qui ne tombe pas juste est arrondie par les plus forts restes, comme pour la génération. À égalité de reste, les positions vont aux premières parties : l'écart est d'au plus une position par label. Sur un très petit dataset, un label de 1 ou 2 positions part entièrement dans l'entraînement.
+- **Au hasard, avec une graine.** Les positions de chaque label sont mélangées avant d'être découpées. Sinon, la validation et le test contiendraient toujours les dernières lignes du fichier, ce qui serait un biais si le fichier était trié. La même graine redonne les mêmes trois fichiers, au bit près.
+- **Sans doublon.** Une position présente deux fois, compteurs de coups mis à part, n'est gardée qu'une fois, et le nombre de doublons retirés est affiché. Sans cela, une même position pourrait être à la fois dans l'entraînement et dans le test : le test mesurerait alors de la mémoire, pas de l'apprentissage. Notre générateur n'en produit pas, mais un dataset venu d'ailleurs pourrait en contenir.
+
+Chaque ligne doit avoir un label valide. Sinon, le script s'arrête en citant le numéro de la ligne, sans écrire de fichier.
+
 ## Les limites
 
 - **Des parties aléatoires, pas de vraies parties.** Les positions comportent des coups que personne ne jouerait. Celles du correcteur ressemblent plutôt à de vraies parties, à en juger par l'exemple du sujet. Si la précision en souffre, on pourra ajouter des positions de parties réelles.
@@ -106,7 +135,8 @@ Sur le dataset de 1 500 positions ci-dessus, le nombre moyen de pièces est pres
 
 - [tests/test_perft.py](../tests/test_perft.py) vérifie les totaux perft de référence, le roque, la prise en passant, la promotion et les clouages.
 - [tests/test_dataset.py](../tests/test_dataset.py) vérifie les labels de positions connues, l'équilibre des classes, l'absence de doublons, la reproductibilité au bit près, et que chaque ligne générée a bien le label donné par les règles. Des parties préparées à l'avance garantissent que les cas rares, comme une position revue ou illégale, sont bien testés.
+- [tests/test_split.py](../tests/test_split.py) vérifie les proportions de chaque label dans les trois parties, qu'elles sont disjointes et contiennent toutes les lignes, que la graine choisit quelles positions vont dans chaque partie, et le retrait des doublons.
 
-Pour vérifier les tests eux-mêmes, 35 erreurs ont été introduites volontairement dans les règles, la labellisation et la génération, et chacune a fait échouer au moins un test.
+Pour vérifier les tests eux-mêmes, 50 erreurs ont été introduites volontairement dans les règles, la labellisation, la génération et le découpage, et chacune a fait échouer au moins un test.
 
 Ces tests se lancent avec `make tests_run`.
