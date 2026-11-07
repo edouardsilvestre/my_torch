@@ -37,6 +37,8 @@ La mise à jour la plus simple retire à chaque paramètre son gradient, multipl
 
 La backpropagation s'arrête à l'étape 3 : elle calcule les gradients, mais ne modifie aucun paramètre. L'étape 4 revient à [l'optimiseur](optimiseurs.md). Séparer ces deux rôles permet de changer de méthode de mise à jour sans toucher à la backpropagation.
 
+La fonction `train` répète ce cycle sur chaque batch du jeu de données : voir [l'entraînement](entrainement.md).
+
 ## La couche dense
 
 Une couche dense calcule `Z = X @ W + b`. Les exemples sont rangés par ligne : `X` a pour forme `(batch, entrées)`.
@@ -137,7 +139,7 @@ Ces tests se lancent avec `make tests_run`.
 
 ## Résultats sur XOR
 
-XOR n'est pas séparable par une droite : il faut une couche cachée et une activation. Ce tableau donne le taux de réussite (les 4 réponses justes) sur 100 graines, avec une descente de gradient simple, 2000 epochs et un learning rate de 0,5. Il se reproduit depuis la racine du dépôt, en une à deux minutes et demie, avec `python3 -m scripts.xor_convergence`.
+XOR n'est pas séparable par une droite : il faut une couche cachée et une activation. Ce tableau donne le taux de réussite (les 4 réponses justes) sur 100 graines, avec une descente de gradient simple, 2000 epochs et un learning rate de 0,5. Il se reproduit depuis la racine du dépôt, en trois minutes environ, avec `python3 -m scripts.xor_convergence`.
 
 | Architecture | Réussite | Coût médian | Graines en échec |
 |---|---|---|---|

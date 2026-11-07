@@ -5,7 +5,7 @@ Run from the root of the repository: python3 -m scripts.optimizer_learning_rates
 
 import numpy as np
 
-from my_torch import Network, get_loss, get_optimizer
+from my_torch import Network, get_loss, get_optimizer, train
 
 XOR_INPUTS = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
 XOR_LABELS = np.array([0, 1, 1, 0])
@@ -45,19 +45,19 @@ XOR_SETTINGS_SEEDS = 100
 REGRESSION_SETTINGS_SEEDS = 20
 
 
-def train(network, optimizer, loss, inputs, targets, epochs):
-    """Train a network on a full batch, then return the final loss."""
-    for _ in range(epochs):
-        network.backward(loss.backward(network.forward(inputs), targets))
-        optimizer.step(network.layers)
-    return loss.forward(network.forward(inputs), targets)
+def train_full_batch(network, optimizer, loss, inputs, targets, epochs):
+    """Train a network on the whole dataset in a fixed order, then return the final loss."""
+    history = train(network, loss, optimizer, inputs, targets, epochs, len(inputs), shuffle=False)
+    return history["loss"][-1]
 
 
 def learns_xor(name, params, learning_rate, seed):
     """Return whether a network gives the 4 right answers of XOR after training."""
     network = Network(2, XOR_ARCHITECTURE, "xavier_normal", seed=seed)
     optimizer = get_optimizer(name, learning_rate=learning_rate, **params)
-    train(network, optimizer, get_loss("cross_entropy"), XOR_INPUTS, XOR_TARGETS, XOR_EPOCHS)
+    train_full_batch(
+        network, optimizer, get_loss("cross_entropy"), XOR_INPUTS, XOR_TARGETS, XOR_EPOCHS
+    )
     return np.array_equal(network.predict(XOR_INPUTS), XOR_LABELS)
 
 
@@ -65,7 +65,7 @@ def regression_outcome(name, params, learning_rate):
     """Describe how a regression ends with a given learning rate."""
     network = Network(2, [(1, "identity")], seed=0)
     optimizer = get_optimizer(name, learning_rate=learning_rate, **params)
-    loss = train(
+    loss = train_full_batch(
         network, optimizer, get_loss("mse"),
         REGRESSION_INPUTS, REGRESSION_TARGETS, DIVERGENCE_EPOCHS,
     )
@@ -78,7 +78,7 @@ def regression_error(name, params, learning_rate, seed):
     """Return the largest distance between the learned parameters and the solution."""
     network = Network(2, [(1, "identity")], seed=seed)
     optimizer = get_optimizer(name, learning_rate=learning_rate, **params)
-    train(
+    train_full_batch(
         network, optimizer, get_loss("mse"),
         REGRESSION_INPUTS, REGRESSION_TARGETS, REGRESSION_EPOCHS,
     )
