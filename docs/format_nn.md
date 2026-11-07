@@ -7,7 +7,7 @@ Ce document décrit ce que contient un fichier `.nn`, pourquoi ce format a été
 ```python
 from my_torch import load_network, save_network
 
-save_network("my_torch_network.nn", network, loss, optimizer, {"batch_size": 64, "epochs": 20})
+save_network("my_torch_network.nn", network, loss, optimizer, settings)
 
 saved = load_network("my_torch_network.nn")
 saved.network.predict(inputs)
@@ -39,11 +39,11 @@ Voici la description d'un réseau `768 → 256 → 64 → 3` entraîné avec Ada
         "name": "adam",
         "hyperparameters": {"learning_rate": 0.001, "beta1": 0.9, "beta2": 0.999, "epsilon": 1e-08}
     },
-    "settings": {"batch_size": 64, "epochs": 20}
+    "settings": {"epochs": 20, "batch_size": 64, "shuffle": true, "seed": null}
 }
 ```
 
-Les réglages de `settings` sont libres pour l'instant : leur liste sera fixée par le fichier de configuration.
+Les réglages de `settings` sont ceux de la section `[training]` du [fichier de configuration](configuration.md), sans le coût, qui est enregistré à part.
 
 ## Ce qui est nécessaire, et ce qui ne l'est pas
 

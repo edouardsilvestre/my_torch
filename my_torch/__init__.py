@@ -1,6 +1,7 @@
 """my_torch: generic neural network module (creation, training, saving/loading)."""
 
 from my_torch.activations import Activation, get_activation
+from my_torch.config import Config, load_config
 from my_torch.errors import MyTorchError
 from my_torch.initializers import get_initializer
 from my_torch.layers import Dense
@@ -12,6 +13,7 @@ from my_torch.training import train
 
 __all__ = [
     "Activation",
+    "Config",
     "Dense",
     "Loss",
     "MyTorchError",
@@ -22,6 +24,7 @@ __all__ = [
     "get_initializer",
     "get_loss",
     "get_optimizer",
+    "load_config",
     "load_network",
     "save_network",
     "train",
