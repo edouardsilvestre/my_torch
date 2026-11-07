@@ -16,9 +16,9 @@ def run_binary(binary, cwd, *arguments):
 
 
 def test_binary_runs_from_another_directory(tmp_path):
-    result = run_binary(ANALYZER, tmp_path)
+    result = run_binary(ANALYZER, tmp_path, "--help")
     assert result.returncode == 0
-    assert result.stdout == ""
+    assert result.stdout.startswith("USAGE\n        ./my_torch_analyzer [--predict")
     assert result.stderr == ""
 
 
@@ -67,3 +67,27 @@ def test_generator_errors_return_84(tmp_path, arguments):
     assert result.stdout == ""
     assert result.stderr.startswith("my_torch_generator: ")
     assert not any(path.suffix == ".nn" for path in tmp_path.iterdir())
+
+
+def test_analyzer_help(tmp_path):
+    result = run_binary(ANALYZER, tmp_path, "--help")
+    assert result.returncode == 0
+    assert result.stdout.startswith("USAGE\n        ./my_torch_analyzer [--predict | --train")
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize("arguments, message", [
+    ((), "missing arguments"),
+    (("net.nn", "boards.txt"), "missing mode"),
+    (("--predict", "--train", "net.nn", "boards.txt"), "cannot be used together"),
+    (("--predict", "--save", "out.nn", "net.nn", "boards.txt"), "only works with --train"),
+    (("--predict", "missing.nn", "boards.txt"), "no such file"),
+])
+def test_analyzer_errors_return_84(tmp_path, arguments, message):
+    (tmp_path / "net.nn").write_text("network")
+    (tmp_path / "boards.txt").write_text("chessboards")
+    result = run_binary(ANALYZER, tmp_path, *arguments)
+    assert result.returncode == 84
+    assert result.stdout == ""
+    assert result.stderr.startswith("my_torch_analyzer: ")
+    assert message in result.stderr.splitlines()[0]
