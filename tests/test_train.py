@@ -24,6 +24,8 @@ EXPECTED = {
     2: ["Check", "Nothing", "Nothing", "Check", "Nothing"],
 }
 SETTINGS = {"epochs": 100, "batch_size": 5, "shuffle": True, "seed": 0}
+CHECKED_SETTINGS = {**SETTINGS, "l2": 0.0, "patience": None, "monitor": "val_loss",
+                    "validation_split": 0.0}
 
 
 def save_trainable(path, outputs=5, settings=SETTINGS):
@@ -86,7 +88,7 @@ def test_saved_network_keeps_what_is_needed_to_train_again(workdir):
     main(["--train", "--save", "trained.nn", "net5.nn", "train.txt"])
     saved = load_network("trained.nn")
     assert saved.optimizer.steps == 100
-    assert saved.settings == SETTINGS
+    assert saved.settings == CHECKED_SETTINGS
     assert saved.optimizer.hyperparameters()["learning_rate"] == 0.01
     main(["--train", "trained.nn", "train.txt"])
     assert load_network("trained.nn").optimizer.steps == 200
@@ -103,7 +105,7 @@ def test_training_data_by_hand(workdir):
     inputs, targets = read_training_data("train.txt", classes)
     assert inputs.shape == (5, 769)
     assert targets.tolist() == [[0, 0, 1], [1, 0, 0], [1, 0, 0], [0, 1, 0], [1, 0, 0]]
-    assert settings == SETTINGS
+    assert settings == CHECKED_SETTINGS
 
 
 @pytest.mark.parametrize("parts, message", [

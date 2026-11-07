@@ -211,7 +211,8 @@ def test_each_call_creates_a_new_optimizer(tmp_path):
 def test_training_settings_are_saved_and_checked_back(tmp_path):
     config = load_config(config_with(tmp_path, "batch_size = 4", "batch_size = 4\nseed = 1"))
     settings = config.training_settings()
-    assert settings == {"epochs": 2000, "batch_size": 4, "shuffle": True, "seed": 1}
+    assert settings == {"epochs": 2000, "batch_size": 4, "shuffle": True, "seed": 1,
+                        "l2": 0.0, "patience": None, "monitor": "val_loss", "validation_split": 0.0}
     save_network(tmp_path / "network.nn", config.create_network(), config.create_loss(),
                  config.create_optimizer(), settings)
     assert check_training_settings(load_network(tmp_path / "network.nn").settings) == settings
@@ -232,6 +233,7 @@ def test_invalid_training_settings_raise_an_error(settings, message):
 def test_training_settings_get_their_defaults():
     assert check_training_settings({"epochs": 3, "batch_size": 4}) == {
         "epochs": 3, "batch_size": 4, "shuffle": True, "seed": None,
+        "l2": 0.0, "patience": None, "monitor": "val_loss", "validation_split": 0.0,
     }
 
 

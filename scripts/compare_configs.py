@@ -34,7 +34,8 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
     history = train(
         network, config.create_loss(), config.create_optimizer(), inputs, targets,
         config.epochs, config.batch_size, config.shuffle, config.training_seed,
-        validation=(validation_inputs, validation_targets),
+        validation=(validation_inputs, validation_targets), l2=config.l2,
+        patience=config.patience, monitor=config.monitor,
     )
     seconds = time.perf_counter() - start
     levels = evaluate_predictions(np.argmax(validation_targets, axis=1),
