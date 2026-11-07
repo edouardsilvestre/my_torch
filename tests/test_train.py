@@ -2,6 +2,8 @@
 
 import os
 
+import numpy as np
+
 import pytest
 
 import analyzer.train as training
@@ -191,3 +193,59 @@ def test_closed_output_during_training_is_an_error(workdir, capsys, monkeypatch)
         "my_torch_analyzer: the standard output was closed during training, nothing was saved\n"
     )
     assert (workdir / "net5.nn").read_bytes() == original
+
+
+def test_hold_out_keeps_a_random_share_aside():
+    inputs = np.arange(20).reshape(20, 1)
+    targets = np.arange(20).reshape(20, 1) * 10
+    kept_inputs, kept_targets, (aside_inputs, aside_targets) = training.hold_out(
+        inputs, targets, 0.25, 3)
+    assert (len(kept_inputs), len(aside_inputs)) == (15, 5)
+    assert sorted(np.concatenate([kept_inputs, aside_inputs])[:, 0].tolist()) == list(range(20))
+    assert np.array_equal(kept_targets, kept_inputs * 10)
+    assert np.array_equal(aside_targets, aside_inputs * 10)
+    assert aside_inputs[:, 0].tolist() != list(range(5))
+    again = training.hold_out(inputs, targets, 0.25, 3)
+    assert np.array_equal(again[2][0], aside_inputs)
+    assert not np.array_equal(training.hold_out(inputs, targets, 0.25, 4)[2][0], aside_inputs)
+
+
+@pytest.mark.parametrize("share", [0.01, 0.99])
+def test_hold_out_needs_both_sets(share):
+    with pytest.raises(AnalyzerError, match="both the training and the validation sets"):
+        training.hold_out(np.zeros((5, 1)), np.zeros((5, 1)), share, 0)
+
+
+def test_early_stopping_with_a_validation_share(workdir, capsys):
+    settings = {**SETTINGS, "epochs": 200, "patience": 3, "validation_split": 0.4,
+                "monitor": "val_accuracy", "l2": 0.001}
+    save_trainable(workdir / "early.nn", settings=settings)
+    assert main(["--train", "early.nn", "train.txt"]) == 0
+    output = capsys.readouterr().out.splitlines()
+    assert "val_accuracy" in output[0]
+    assert output[-1].startswith("early stopping: best val_accuracy")
+    assert len(output) < 200
+    assert load_network("early.nn").settings == {**CHECKED_SETTINGS, **settings}
+
+
+def test_early_stopping_without_a_validation_share_is_refused(workdir, capsys):
+    save_trainable(workdir / "early.nn", settings={**SETTINGS, "patience": 3})
+    original = (workdir / "early.nn").read_bytes()
+    assert main(["--train", "early.nn", "train.txt"]) == 84
+    assert ("early stopping needs a validation set: set validation_split in the training "
+            "settings") in capsys.readouterr().err
+    assert (workdir / "early.nn").read_bytes() == original
+
+
+def test_the_saved_settings_are_given_to_the_training(workdir, monkeypatch):
+    calls = []
+    real_train = training.train
+    monkeypatch.setattr(training, "train", lambda *arguments, **options: (
+        calls.append(options), real_train(*arguments, **options))[1])
+    settings = {**SETTINGS, "epochs": 3, "l2": 0.25, "patience": 2, "validation_split": 0.4,
+                "monitor": "val_accuracy"}
+    save_trainable(workdir / "early.nn", settings=settings)
+    assert main(["--train", "early.nn", "train.txt"]) == 0
+    assert len(calls) == 1
+    assert {key: calls[0][key] for key in ("l2", "patience", "monitor")} == {
+        "l2": 0.25, "patience": 2, "monitor": "val_accuracy"}

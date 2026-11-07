@@ -73,3 +73,12 @@ def test_invalid_configuration_stops_with_a_message(files):
     with pytest.raises(SystemExit) as error:
         run(files, "bad.conf")
     assert "4 outputs cannot predict chess labels" in str(error.value.code)
+
+
+def test_early_stopping_of_a_configuration_is_used(files):
+    stopping = 'seed = 0\npatience = 3\nmonitor = "val_accuracy"\n\n[optimizer]'
+    early = CONFIG.format(hidden=32, outputs=5).replace("seed = 0\n\n[optimizer]", stopping)
+    (files / "early.conf").write_text(early)
+    run(files, "early.conf", json_name="results.json")
+    result = json.loads((files / "results.json").read_text())[0]
+    assert len(result["history"]["val_accuracy"]) == result["best_epoch"] + 3 < 100

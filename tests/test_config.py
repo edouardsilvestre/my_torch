@@ -255,3 +255,42 @@ def test_xor_example_learns_xor():
     )
     assert history["loss"][-1] < 0.01
     assert network.predict(XOR_INPUTS).tolist() == XOR_LABELS.tolist()
+
+
+def test_regularisation_and_early_stopping_keys(tmp_path):
+    lines = 'batch_size = 4\nl2 = 0.001\npatience = 3\nmonitor = "val_accuracy"\n'
+    path = config_with(tmp_path, "batch_size = 4", lines + "validation_split = 0.1")
+    config = load_config(path)
+    assert (config.l2, config.patience, config.monitor, config.validation_split) == (
+        0.001, 3, "val_accuracy", 0.1)
+    assert config.training_settings() == {
+        "epochs": 2000, "batch_size": 4, "shuffle": True, "seed": None, "l2": 0.001,
+        "patience": 3, "monitor": "val_accuracy", "validation_split": 0.1,
+    }
+
+
+def test_regularisation_and_early_stopping_defaults(tmp_path):
+    config = load_config(write_config(tmp_path, CONFIG))
+    assert (config.l2, config.patience, config.monitor, config.validation_split) == (
+        0.0, None, "val_loss", 0.0)
+
+
+@pytest.mark.parametrize("line, message", [
+    ("l2 = -1", "training.l2 must not be negative"),
+    ("l2 = true", "training.l2 must be a finite number"),
+    ("patience = 0", "training.patience must be a positive integer"),
+    ("patience = 2.5", "training.patience must be a positive integer"),
+    ('monitor = "loss"', "training.monitor must be one of"),
+    ("validation_split = 1", "training.validation_split must be in [0, 1["),
+    ("validation_split = -0.1", "training.validation_split must be in [0, 1["),
+])
+def test_invalid_regularisation_and_early_stopping_values(tmp_path, line, message):
+    path = config_with(tmp_path, "batch_size = 4", f"batch_size = 4\n{line}")
+    with pytest.raises(MyTorchError) as error:
+        load_config(path)
+    assert message in str(error.value)
+
+
+def test_old_settings_get_the_new_defaults():
+    assert check_training_settings({"epochs": 3, "batch_size": 4, "l2": 0.01})["l2"] == 0.01
+    assert check_training_settings({"epochs": 3, "batch_size": 4})["patience"] is None
