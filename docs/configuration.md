@@ -27,7 +27,7 @@ name = "sgd"
 learning_rate = 0.5
 ```
 
-Le dépôt contient aussi [configs/basic_network.conf](../configs/basic_network.conf), un premier réseau pour les échiquiers. Il est **provisoire** : sa taille d'entrée dépend de l'encodage de l'échiquier, son nombre de sorties dépend des labels retenus, et ses réglages ne sont pas encore mesurés.
+Le dépôt contient aussi [configs/basic_network.conf](../configs/basic_network.conf), un premier réseau pour les échiquiers. Sa taille d'entrée, 769, est celle de [l'encodage de l'échiquier](encodage.md). Il reste **provisoire** : son nombre de sorties dépend des labels retenus, et ses réglages ne sont pas encore mesurés.
 
 ## Pourquoi TOML
 
