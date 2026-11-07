@@ -55,6 +55,14 @@ LOSSES = {
 }
 
 
+def loss_name(loss: Loss) -> str:
+    """Return the name under which a loss can be created again."""
+    for name, loss_class in LOSSES.items():
+        if type(loss) is loss_class:
+            return name
+    raise MyTorchError(f"unknown loss class '{type(loss).__name__}'")
+
+
 def get_loss(name: str) -> Loss:
     """Return a new loss from its name."""
     if name not in LOSSES:

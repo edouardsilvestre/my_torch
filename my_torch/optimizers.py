@@ -16,6 +16,19 @@ def check_decay(name: str, value: float) -> None:
         raise MyTorchError(f"{name} must be in [0, 1[, got {value}")
 
 
+def parse_state_key(key: str, layers: list[Dense]) -> tuple[str, int, str]:
+    """Split a state key such as 'velocities/0/weights' into its three parts."""
+    parts = key.split("/")
+    if (
+        len(parts) != 3
+        or not parts[1].isdigit()
+        or int(parts[1]) >= len(layers)
+        or parts[2] not in ("weights", "biases")
+    ):
+        raise MyTorchError(f"invalid optimizer state key '{key}'")
+    return parts[0], int(parts[1]), parts[2]
+
+
 class Optimizer:
     """Update the parameters of the layers from their gradients."""
 
@@ -34,6 +47,46 @@ class Optimizer:
     def compute_update(self, key: tuple[int, str], gradient: np.ndarray) -> np.ndarray:
         """Return the quantity to subtract from the parameter identified by key."""
         raise NotImplementedError
+
+    def hyperparameters(self) -> dict[str, float | bool]:
+        """Return the parameters needed to create the same optimizer again."""
+        return {"learning_rate": float(self.learning_rate)}
+
+    def memories(self) -> dict[str, dict[tuple[int, str], np.ndarray]]:
+        """Return the arrays kept for each parameter, by kind of memory."""
+        return {}
+
+    def state(self) -> dict[str, np.ndarray]:
+        """Return the memory of the optimizer as arrays named 'kind/layer/parameter'."""
+        return {
+            f"{kind}/{index}/{parameter}": array
+            for kind, memory in self.memories().items()
+            for (index, parameter), array in memory.items()
+        }
+
+    def load_state(self, state: dict[str, np.ndarray], layers: list[Dense]) -> None:
+        """Replace the memory of the optimizer by a state exported for these layers."""
+        memories = self.memories()
+        loaded: dict[str, dict[tuple[int, str], np.ndarray]] = {kind: {} for kind in memories}
+        for key, array in state.items():
+            kind, index, parameter = parse_state_key(key, layers)
+            if kind not in memories:
+                raise MyTorchError(f"unexpected optimizer state '{key}'")
+            expected_shape = getattr(layers[index], parameter).shape
+            if (
+                not isinstance(array, np.ndarray)
+                or array.dtype.kind != "f"
+                or array.shape != expected_shape
+            ):
+                raise MyTorchError(
+                    f"optimizer state '{key}' must be a float array of shape {expected_shape}"
+                )
+            if not np.all(np.isfinite(array)) or (kind == "squares" and np.any(array < 0)):
+                raise MyTorchError(f"optimizer state '{key}' holds invalid values")
+            loaded[kind][(index, parameter)] = array.astype(np.float64)
+        for kind, memory in memories.items():
+            memory.clear()
+            memory.update(loaded[kind])
 
 
 class SGD(Optimizer):
@@ -55,6 +108,16 @@ class Momentum(Optimizer):
         self.nesterov = nesterov
         self.velocities: dict[tuple[int, str], np.ndarray] = {}
 
+    def hyperparameters(self) -> dict[str, float | bool]:
+        return {
+            **super().hyperparameters(),
+            "momentum": float(self.momentum),
+            "nesterov": bool(self.nesterov),
+        }
+
+    def memories(self) -> dict[str, dict[tuple[int, str], np.ndarray]]:
+        return {"velocities": self.velocities}
+
     def compute_update(self, key: tuple[int, str], gradient: np.ndarray) -> np.ndarray:
         velocity = self.momentum * self.velocities.get(key, 0.0) + gradient
         self.velocities[key] = velocity
@@ -75,6 +138,16 @@ class RMSProp(Optimizer):
         self.decay = decay
         self.epsilon = epsilon
         self.squares: dict[tuple[int, str], np.ndarray] = {}
+
+    def hyperparameters(self) -> dict[str, float | bool]:
+        return {
+            **super().hyperparameters(),
+            "decay": float(self.decay),
+            "epsilon": float(self.epsilon),
+        }
+
+    def memories(self) -> dict[str, dict[tuple[int, str], np.ndarray]]:
+        return {"squares": self.squares}
 
     def compute_update(self, key: tuple[int, str], gradient: np.ndarray) -> np.ndarray:
         square = self.decay * self.squares.get(key, 0.0) + (1 - self.decay) * gradient ** 2
@@ -107,6 +180,37 @@ class Adam(Optimizer):
         self.steps += 1
         super().step(layers)
 
+    def hyperparameters(self) -> dict[str, float | bool]:
+        return {
+            **super().hyperparameters(),
+            "beta1": float(self.beta1),
+            "beta2": float(self.beta2),
+            "epsilon": float(self.epsilon),
+        }
+
+    def memories(self) -> dict[str, dict[tuple[int, str], np.ndarray]]:
+        return {"means": self.means, "squares": self.squares}
+
+    def state(self) -> dict[str, np.ndarray]:
+        return {**super().state(), "steps": np.array(self.steps)}
+
+    def load_state(self, state: dict[str, np.ndarray], layers: list[Dense]) -> None:
+        state = dict(state)
+        steps = state.pop("steps", None)
+        if (
+            not isinstance(steps, np.ndarray)
+            or steps.shape != ()
+            or steps.dtype.kind not in "iu"
+            or steps < 0
+        ):
+            raise MyTorchError("optimizer state 'steps' must be a non-negative integer")
+        means = {key.split("/", 1)[1] for key in state if key.startswith("means/")}
+        squares = {key.split("/", 1)[1] for key in state if key.startswith("squares/")}
+        if means != squares or (means and steps == 0):
+            raise MyTorchError("optimizer state of Adam is inconsistent")
+        super().load_state(state, layers)
+        self.steps = int(steps)
+
     def compute_update(self, key: tuple[int, str], gradient: np.ndarray) -> np.ndarray:
         mean = self.beta1 * self.means.get(key, 0.0) + (1 - self.beta1) * gradient
         square = self.beta2 * self.squares.get(key, 0.0) + (1 - self.beta2) * gradient ** 2
@@ -123,6 +227,14 @@ OPTIMIZERS = {
     "rmsprop": RMSProp,
     "adam": Adam,
 }
+
+
+def optimizer_name(optimizer: Optimizer) -> str:
+    """Return the name under which an optimizer can be created again."""
+    for name, optimizer_class in OPTIMIZERS.items():
+        if type(optimizer) is optimizer_class:
+            return name
+    raise MyTorchError(f"unknown optimizer class '{type(optimizer).__name__}'")
 
 
 def get_optimizer(name: str, **params: float | bool) -> Optimizer:
