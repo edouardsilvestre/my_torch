@@ -41,7 +41,7 @@ def read_training_data(path: str, classes: tuple[str, ...]) -> tuple[np.ndarray,
     """Read the labelled chessboards, and return the inputs and targets of the network."""
     chessboards = read_chessfile(path, require_labels=True)
     if not chessboards:
-        raise AnalyzerError(f"no chessboard to train on in '{path}'")
+        raise AnalyzerError(f"no labelled chessboard in '{path}'")
     for chessboard in chessboards:
         try:
             to_class(chessboard.label, classes)

@@ -54,7 +54,7 @@ USAGE
 | Ligne invalide dans le fichier d'échiquiers | `chessboards.txt:6: invalid FEN '8/8/8 w - - 0 1': ...` |
 | Réseau sans de quoi l'entraîner | `network file 'net.nn' has no loss, optimizer, training settings: it cannot be trained; ...` |
 | Label incompatible avec les classes du réseau | `train.txt:3: label 'Check' does not tell which of these classes it is: ...` |
-| Fichier d'entraînement sans échiquier | `no chessboard to train on in 'train.txt'` |
+| Fichier d'entraînement sans échiquier | `no labelled chessboard in 'train.txt'` |
 | Ctrl+C | `interrupted, nothing was saved` |
 | Sortie fermée pendant l'entraînement | `the standard output was closed during training, nothing was saved` |
 
