@@ -5,7 +5,7 @@ Run from the root of the repository: python3 -m scripts.xor_convergence
 
 import numpy as np
 
-from my_torch import Network, get_loss, get_optimizer
+from my_torch import Network, get_loss, get_optimizer, train
 
 INPUTS = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
 LABELS = np.array([0, 1, 1, 0])
@@ -24,23 +24,24 @@ CONFIGURATIONS = [
 ]
 
 
-def train(architecture: list[tuple[int, str]], initializer: str, seed: int) -> tuple[bool, float]:
+def train_network(
+    architecture: list[tuple[int, str]], initializer: str, seed: int
+) -> tuple[bool, float]:
     """Train a network with a plain gradient descent, return its success and final loss."""
-    loss = get_loss("cross_entropy")
-    optimizer = get_optimizer("sgd", learning_rate=LEARNING_RATE)
     network = Network(2, architecture, initializer, seed=seed)
-    for _ in range(EPOCHS):
-        network.backward(loss.backward(network.forward(INPUTS), TARGETS))
-        optimizer.step(network.layers)
+    history = train(
+        network, get_loss("cross_entropy"), get_optimizer("sgd", learning_rate=LEARNING_RATE),
+        INPUTS, TARGETS, EPOCHS, len(INPUTS), shuffle=False,
+    )
     success = np.array_equal(network.predict(INPUTS), LABELS)
-    return success, loss.forward(network.forward(INPUTS), TARGETS)
+    return success, history["loss"][-1]
 
 
 def main() -> None:
     print("| Architecture | Réussite | Coût médian | Graines en échec |")
     print("|---|---|---|---|")
     for name, architecture, initializer in CONFIGURATIONS:
-        results = [train(architecture, initializer, seed) for seed in range(SEEDS)]
+        results = [train_network(architecture, initializer, seed) for seed in range(SEEDS)]
         failures = [seed for seed, (success, _) in enumerate(results) if not success]
         median = np.median([loss for _, loss in results])
         listed = ", ".join(map(str, failures)) if len(failures) <= MAX_LISTED_FAILURES else "..."

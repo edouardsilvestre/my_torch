@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from my_torch import Network, get_loss, get_optimizer
+from my_torch import Network, get_loss, get_optimizer, train
 
 XOR_INPUTS = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
 XOR_LABELS = np.array([0, 1, 1, 0])
@@ -19,16 +19,16 @@ REGRESSION_TARGETS = REGRESSION_INPUTS @ REGRESSION_WEIGHTS + REGRESSION_BIAS
 SEEDS = [0, 1, 2]
 
 
-def train(network, optimizer, loss, inputs, targets, epochs=2000):
-    """Train a network on a full batch, then return the final loss."""
-    for _ in range(epochs):
-        network.backward(loss.backward(network.forward(inputs), targets))
-        optimizer.step(network.layers)
-    return loss.forward(network.forward(inputs), targets)
+def train_full_batch(network, optimizer, loss, inputs, targets, epochs=2000):
+    """Train a network on the whole dataset in a fixed order, then return the final loss."""
+    history = train(network, loss, optimizer, inputs, targets, epochs, len(inputs), shuffle=False)
+    return history["loss"][-1]
 
 
 def train_on_xor(network, optimizer):
-    return train(network, optimizer, get_loss("cross_entropy"), XOR_INPUTS, XOR_TARGETS)
+    return train_full_batch(
+        network, optimizer, get_loss("cross_entropy"), XOR_INPUTS, XOR_TARGETS
+    )
 
 
 @pytest.mark.parametrize("seed", SEEDS)
@@ -72,7 +72,7 @@ def test_optimizer_learns_xor(name, params, seed):
 ])
 def test_optimizer_finds_the_solution_of_a_linear_regression(name, params, seed):
     network = Network(2, [(1, "identity")], seed=seed)
-    train(
+    train_full_batch(
         network, get_optimizer(name, **params), get_loss("mse"),
         REGRESSION_INPUTS, REGRESSION_TARGETS,
     )
