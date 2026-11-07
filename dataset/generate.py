@@ -50,20 +50,24 @@ def play_random_game(rng: random.Random) -> Iterator[Board]:
         yield board
 
 
-def split_size(size: int, shares: dict[str, float]) -> dict[str, int]:
-    """Share the size between the labels, so that the counts always add up to the size.
+def share_out(total: int, weights: list[float]) -> list[int]:
+    """Share a total in proportion to the weights, so that the parts always add up to it.
 
-    Each label first gets the integer part of its share; the positions left go to the
-    labels whose share lost the most when rounded down.
+    Each part first gets the integer part of its share; what is left goes to the parts
+    whose share lost the most when rounded down.
     """
-    total_share = sum(shares.get(label, 0.0) for label in LABELS)
-    exact = {label: size * shares.get(label, 0.0) / total_share for label in LABELS}
-    counts = {label: int(exact[label]) for label in LABELS}
-    left = size - sum(counts.values())
-    by_loss = sorted(LABELS, key=lambda label: exact[label] - counts[label], reverse=True)
-    for label in by_loss[:left]:
-        counts[label] += 1
+    exact = [total * weight / sum(weights) for weight in weights]
+    counts = [int(value) for value in exact]
+    by_loss = sorted(range(len(weights)), key=lambda i: exact[i] - counts[i], reverse=True)
+    for index in by_loss[:total - sum(counts)]:
+        counts[index] += 1
     return counts
+
+
+def split_size(size: int, shares: dict[str, float]) -> dict[str, int]:
+    """Share the size between the labels, so that the counts always add up to the size."""
+    counts = share_out(size, [shares.get(label, 0.0) for label in LABELS])
+    return dict(zip(LABELS, counts))
 
 
 def position_key(board: Board) -> str:
