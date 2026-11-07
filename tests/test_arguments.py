@@ -159,9 +159,9 @@ def test_read_only_directory(workdir, argv, mode):
         os.chmod(workdir / "locked", 0o700)
 
 
-def test_training_is_not_available_yet(workdir, capsys):
+def test_training_starts_once_the_arguments_are_valid(workdir, capsys):
     assert main(["--train", "net.nn", "boards.txt"]) == 84
-    assert capsys.readouterr().err == "my_torch_analyzer: --train is not available yet\n"
+    assert "invalid network file 'net.nn'" in capsys.readouterr().err
 
 
 def test_nothing_is_created(workdir):

@@ -4,12 +4,13 @@ from typing import Any
 
 import numpy as np
 
+from analyzer.arguments import Arguments
 from analyzer.chessfile import read_chessfile
 from analyzer.encoding import encode_positions
 from analyzer.errors import AnalyzerError
 from analyzer.labels import encode_labels, to_class
 from analyzer.predict import check_chess_network
-from my_torch import MyTorchError, SavedNetwork, load_network
+from my_torch import MyTorchError, SavedNetwork, load_network, save_network, train
 from my_torch.config import check_training_settings
 
 
@@ -49,3 +50,18 @@ def read_training_data(path: str, classes: tuple[str, ...]) -> tuple[np.ndarray,
     inputs = encode_positions(chessboard.position for chessboard in chessboards)
     targets = encode_labels((chessboard.label for chessboard in chessboards), classes)
     return inputs, targets
+
+
+def run_training(arguments: Arguments) -> None:
+    """Train the network on the labelled chessboards, then save it once training is over."""
+    saved, classes, settings = load_training_network(arguments.load_file)
+    inputs, targets = read_training_data(arguments.chess_file, classes)
+    train(
+        saved.network, saved.loss, saved.optimizer, inputs, targets,
+        settings["epochs"], settings["batch_size"], settings["shuffle"], settings["seed"],
+        verbose=True,
+    )
+    save_network(
+        arguments.save_file or arguments.load_file, saved.network, saved.loss,
+        saved.optimizer, settings,
+    )

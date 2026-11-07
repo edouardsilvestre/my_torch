@@ -6,6 +6,7 @@ import sys
 from analyzer.arguments import PREDICT, USAGE, UsageError, check_files, parse_arguments
 from analyzer.errors import AnalyzerError
 from analyzer.predict import predict
+from analyzer.train import run_training
 from my_torch import MyTorchError
 
 EXIT_SUCCESS = 0
@@ -21,8 +22,8 @@ def run(argv: list[str]) -> None:
     check_files(arguments)
     if arguments.mode == PREDICT:
         predict(arguments)
-        return
-    raise AnalyzerError(f"--{arguments.mode} is not available yet")
+    else:
+        run_training(arguments)
 
 
 def silence_standard_output() -> None:
