@@ -57,6 +57,12 @@ def evaluate(
     return metrics
 
 
+def format_epoch(epoch: int, epochs: int, history: dict[str, list[float]]) -> str:
+    """Describe the metrics of the last epoch on a single line."""
+    metrics = " - ".join(f"{name} {values[-1]:.4f}" for name, values in history.items())
+    return f"epoch {epoch:>{len(str(epochs))}}/{epochs} - {metrics}"
+
+
 def train(
     network: Network,
     loss: Loss,
@@ -68,6 +74,7 @@ def train(
     shuffle: bool = True,
     seed: int | None = None,
     validation: tuple[np.ndarray, np.ndarray] | None = None,
+    verbose: bool = False,
 ) -> dict[str, list[float]]:
     """Train a network on a dataset, with one optimizer step per batch.
 
@@ -82,7 +89,7 @@ def train(
     check_count("batch_size", batch_size)
     rng = np.random.default_rng(seed)
     history: dict[str, list[float]] = {}
-    for _ in range(epochs):
+    for epoch in range(1, epochs + 1):
         order = rng.permutation(len(inputs)) if shuffle else np.arange(len(inputs))
         for start in range(0, len(inputs), batch_size):
             batch = order[start:start + batch_size]
@@ -95,4 +102,6 @@ def train(
                 metrics[f"val_{name}"] = value
         for name, value in metrics.items():
             history.setdefault(name, []).append(value)
+        if verbose:
+            print(format_epoch(epoch, epochs, history), flush=True)
     return history
