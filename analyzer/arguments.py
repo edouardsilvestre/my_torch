@@ -1,5 +1,6 @@
 """Command line arguments of my_torch_analyzer."""
 
+import os
 from dataclasses import dataclass
 
 from analyzer.errors import AnalyzerError
@@ -83,3 +84,31 @@ def parse_arguments(argv: list[str]) -> Arguments:
     if len(files) != 2:
         raise UsageError(f"expected LOADFILE and CHESSFILE, got {len(files)} file(s)")
     return Arguments(mode, files[0], files[1], save_file)
+
+
+def check_readable(path: str, name: str) -> None:
+    if not os.path.exists(path):
+        raise AnalyzerError(f"cannot read {name} '{path}': no such file")
+    if os.path.isdir(path):
+        raise AnalyzerError(f"cannot read {name} '{path}': is a directory")
+    if not os.access(path, os.R_OK):
+        raise AnalyzerError(f"cannot read {name} '{path}': permission denied")
+
+
+def check_writable(path: str) -> None:
+    """Check that the network can be saved to a path, before any long training."""
+    directory = os.path.dirname(os.path.abspath(path))
+    if os.path.isdir(path):
+        raise AnalyzerError(f"cannot save the network to '{path}': is a directory")
+    if not os.path.isdir(directory):
+        raise AnalyzerError(f"cannot save the network to '{path}': no such directory")
+    if not os.access(directory, os.W_OK | os.X_OK):
+        raise AnalyzerError(f"cannot save the network to '{path}': permission denied")
+
+
+def check_files(arguments: Arguments) -> None:
+    """Check the files of the command line before starting the work."""
+    check_readable(arguments.load_file, "LOADFILE")
+    check_readable(arguments.chess_file, "CHESSFILE")
+    if arguments.mode == TRAIN:
+        check_writable(arguments.save_file or arguments.load_file)

@@ -2,7 +2,7 @@
 
 import sys
 
-from analyzer.arguments import USAGE, UsageError, parse_arguments
+from analyzer.arguments import USAGE, UsageError, check_files, parse_arguments
 from analyzer.errors import AnalyzerError
 from my_torch import MyTorchError
 
@@ -16,6 +16,7 @@ def run(argv: list[str]) -> None:
         print(USAGE)
         return
     arguments = parse_arguments(argv)
+    check_files(arguments)
     raise AnalyzerError(f"--{arguments.mode} is not available yet")
 
 
