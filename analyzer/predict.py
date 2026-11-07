@@ -1,0 +1,45 @@
+"""Prediction mode of my_torch_analyzer."""
+
+import sys
+
+import numpy as np
+
+from analyzer.arguments import Arguments
+from analyzer.chessfile import read_chessfile
+from analyzer.encoding import INPUT_SIZE, encode_positions
+from analyzer.errors import AnalyzerError
+from analyzer.labels import decode_predictions, get_classes
+from my_torch import Network, load_network
+
+PREDICTION_BATCH_SIZE = 1024
+
+
+def load_chess_network(path: str) -> tuple[Network, tuple[str, ...]]:
+    """Load a network, and check that it reads encoded chessboards and predicts labels."""
+    network = load_network(path).network
+    if network.input_size != INPUT_SIZE:
+        raise AnalyzerError(
+            f"network expects {network.input_size} inputs, "
+            f"but chessboards are encoded with {INPUT_SIZE}"
+        )
+    return network, get_classes(network.architecture[-1][0])
+
+
+def predict_classes(network: Network, inputs: np.ndarray) -> np.ndarray:
+    """Return the predicted class of each row, computed by batches to bound the memory."""
+    predictions = [
+        network.predict(inputs[start:start + PREDICTION_BATCH_SIZE])
+        for start in range(0, len(inputs), PREDICTION_BATCH_SIZE)
+    ]
+    return np.concatenate(predictions) if predictions else np.zeros(0, dtype=int)
+
+
+def predict(arguments: Arguments) -> None:
+    """Print the predicted label of each chessboard, one per line, in the order of the file."""
+    network, classes = load_chess_network(arguments.load_file)
+    chessboards = read_chessfile(arguments.chess_file)
+    inputs = encode_positions(chessboard.position for chessboard in chessboards)
+    labels = decode_predictions(predict_classes(network, inputs), classes)
+    if labels:
+        sys.stdout.write("\n".join(labels) + "\n")
+    sys.stdout.flush()
