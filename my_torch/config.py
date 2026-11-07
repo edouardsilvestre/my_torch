@@ -9,8 +9,9 @@ from typing import Any
 from my_torch.activations import ACTIVATIONS
 from my_torch.errors import MyTorchError
 from my_torch.initializers import INITIALIZERS
-from my_torch.losses import LOSSES
-from my_torch.optimizers import OPTIMIZERS, get_optimizer
+from my_torch.losses import LOSSES, Loss, get_loss
+from my_torch.network import Network
+from my_torch.optimizers import OPTIMIZERS, Optimizer, get_optimizer
 
 DEFAULT_INITIALIZER = "he"
 DEFAULT_SHUFFLE = True
@@ -31,6 +32,29 @@ class Config:
     batch_size: int
     shuffle: bool
     training_seed: int | None
+
+    def create_network(self, seed: int | None = None) -> Network:
+        """Create a blank network, with the seed of the configuration unless another is given."""
+        return Network(
+            self.input_size, self.layers, self.initializer,
+            self.seed if seed is None else seed,
+        )
+
+    def create_loss(self) -> Loss:
+        return get_loss(self.loss)
+
+    def create_optimizer(self) -> Optimizer:
+        """Create a new optimizer: each network needs its own."""
+        return get_optimizer(self.optimizer, **self.optimizer_params)
+
+    def training_settings(self) -> dict[str, Any]:
+        """Return the training settings to save with the network."""
+        return {
+            "epochs": self.epochs,
+            "batch_size": self.batch_size,
+            "shuffle": self.shuffle,
+            "seed": self.training_seed,
+        }
 
 
 def check_keys(table: Any, where: str, required: set[str], optional: set[str]) -> None:
@@ -124,6 +148,11 @@ def read_training(table: Any, where: str = "training", with_loss: bool = True) -
     if with_loss:
         training["loss"] = read_name(table["loss"], f"{where}.loss", LOSSES)
     return training
+
+
+def check_training_settings(settings: Any) -> dict[str, Any]:
+    """Check training settings read back from a network file, and fill the defaults."""
+    return read_training(settings, "settings", with_loss=False)
 
 
 def read_optimizer(table: Any) -> tuple[str, dict[str, float | bool]]:
