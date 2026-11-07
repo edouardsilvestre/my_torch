@@ -34,8 +34,14 @@ def evaluate(network_path: str, chess_path: str) -> list[LevelMetrics]:
     """
     network, classes = load_chess_network(network_path)
     inputs, targets = read_training_data(chess_path, classes)
-    expected = np.argmax(targets, axis=1)
-    predicted = predict_classes(network, inputs)
+    return evaluate_predictions(np.argmax(targets, axis=1), predict_classes(network, inputs),
+                                classes)
+
+
+def evaluate_predictions(
+    expected: np.ndarray, predicted: np.ndarray, classes: tuple[str, ...]
+) -> list[LevelMetrics]:
+    """Compute the metrics of predicted class indices, with these classes and simpler ones."""
     levels = []
     for size in sorted(CLASS_SETS, reverse=True):
         if size > len(classes):

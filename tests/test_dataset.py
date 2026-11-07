@@ -171,3 +171,42 @@ def test_script_uses_its_seed(tmp_path):
     lines = (tmp_path / "a.txt").read_text().splitlines()
     assert lines == generate_dataset(10, 3)[0]
     assert lines != generate_dataset(10, 2)[0]
+
+
+def test_a_single_chunk_is_the_dataset_generated_from_the_seed_itself():
+    from dataset.generate import generate_chunk, split_size
+    assert generate_dataset(12, 5) == generate_chunk(split_size(12, label_shares(1, 1, 1)), 5)
+
+
+def test_the_number_of_jobs_does_not_change_the_dataset():
+    sequential = generate_dataset(24, 3, jobs=1, chunk_size=8)
+    assert generate_dataset(24, 3, jobs=2, chunk_size=8) == sequential
+    assert generate_dataset(24, 3, jobs=3, chunk_size=8) == sequential
+    assert generate_dataset(24, 3, jobs=4, chunk_size=8) == sequential
+    lines, _ = sequential
+    assert labels_of(lines) == {"Nothing": 8, "Check White": 4, "Check Black": 4,
+                                "Checkmate White": 4, "Checkmate Black": 4}
+    assert len(set(fens_of(lines))) == len(lines)
+
+
+def test_a_position_found_by_two_chunks_is_replaced(monkeypatch):
+    prepared_games(monkeypatch, [[NOTHING_A], [NOTHING_B], [NOTHING_A], [NOTHING_C],
+                                 [NOTHING_A], [NOTHING_D]])
+    lines, games = generate_dataset(4, 0, label_shares(1, 0, 0), chunk_size=2)
+    assert sorted(fens_of(lines)) == sorted([NOTHING_A, NOTHING_B, NOTHING_C, NOTHING_D])
+    assert games == 6
+
+
+def test_script_refuses_zero_jobs(tmp_path):
+    with pytest.raises(SystemExit) as error:
+        generate_main(["--size", "10", "--jobs", "0", "--output", str(tmp_path / "out.txt")])
+    assert error.value.code == 2
+
+
+def test_each_chunk_comes_from_its_own_seed():
+    from dataset.generate import generate_chunk, share_out, split_size
+    targets = split_size(24, label_shares(1, 1, 1))
+    lines = set(generate_dataset(24, 3, chunk_size=8)[0])
+    for index, chunk_seed in enumerate([3, "3-1", "3-2"]):
+        plan = {label: share_out(targets[label], [1, 1, 1])[index] for label in LABELS}
+        assert set(generate_chunk(plan, chunk_seed)[0]) <= lines

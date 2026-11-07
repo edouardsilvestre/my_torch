@@ -6,6 +6,7 @@ The same arguments always give the same file.
 """
 
 import argparse
+import os
 import sys
 import time
 from collections import Counter
@@ -32,16 +33,22 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True, help="file to write")
     parser.add_argument("--shares", type=parse_shares, default=parse_shares("1:1:1"),
                         help="shares of Nothing, Check and Checkmate (default 1:1:1)")
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
+                        help="processes generating at once (default: all cores); "
+                             "the dataset does not depend on it")
     arguments = parser.parse_args(argv)
     if arguments.size < 1:
         parser.error("--size must be a positive integer")
+    if arguments.jobs < 1:
+        parser.error("--jobs must be a positive integer")
     return arguments
 
 
 def main(argv: list[str]) -> None:
     arguments = parse_arguments(argv)
     start = time.perf_counter()
-    lines, games = generate_dataset(arguments.size, arguments.seed, arguments.shares)
+    lines, games = generate_dataset(arguments.size, arguments.seed, arguments.shares,
+                                    arguments.jobs)
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text("\n".join(lines) + "\n")
     counts = Counter(line.split(" ", 6)[6] for line in lines)
