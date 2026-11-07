@@ -2,28 +2,28 @@
 # Rebuild my_torch_network.nn from scratch, exactly as it was trained.
 #
 # Run from the root of the repository:  ./scripts/build_network.sh
-# The dataset is written to datasets/ (ignored by git) and reused if it is already there.
-# SIZE, SEED, CONFIG and OUTPUT can be changed through the environment, to try the
-# pipeline on a smaller dataset.
+# The network is trained on the dataset given with the subject, dataset.zip, which must be
+# at the root of the repository: it is not pushed, since everyone gets it with the subject.
+# SEED, CONFIG, ARCHIVE and OUTPUT can be changed through the environment.
 
 set -eu
 
-SIZE="${SIZE:-100000}"
 SEED="${SEED:-0}"
 CONFIG="${CONFIG:-configs/my_torch_network.conf}"
+ARCHIVE="${ARCHIVE:-dataset.zip}"
 OUTPUT="${OUTPUT:-my_torch_network.nn}"
-DATASET="datasets/all_${SIZE}_${SEED}.txt"
-STEM="datasets/all_${SIZE}_${SEED}"
+STEM="datasets/official"
 BLANK="$(basename "${CONFIG%.*}")_1.nn"
+
+if [ ! -f "$ARCHIVE" ]; then
+    echo "build_network: $ARCHIVE not found: put the dataset given with the subject there" >&2
+    exit 1
+fi
 
 make --no-print-directory
 
-if [ -f "$DATASET" ]; then
-    echo "Reusing $DATASET"
-else
-    python3 -m scripts.generate_dataset --size "$SIZE" --seed "$SEED" --output "$DATASET"
-fi
-python3 -m scripts.split_dataset --input "$DATASET" --seed "$SEED"
+python3 -m scripts.prepare_official_dataset --archive "$ARCHIVE" --output "$STEM.txt"
+python3 -m scripts.split_dataset --input "$STEM.txt" --seed "$SEED"
 
 ./my_torch_generator "$CONFIG" 1
 ./my_torch_analyzer --train --save "$OUTPUT" "$BLANK" "${STEM}_train.txt"
