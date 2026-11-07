@@ -130,7 +130,7 @@ def test_network_without_valid_training_information(workdir, capsys, parts, mess
     (f"{FENS[0]} Nothing\n\n{FENS[1]} Check\n", "net5.nn",
      "train.txt:3: label 'Check' does not tell"),
     (f"{FENS[0]} Chek\n", "net3.nn", "train.txt:1: unknown label 'Chek'"),
-    ("\n\n", "net3.nn", "no chessboard to train on in 'train.txt'"),
+    ("\n\n", "net3.nn", "no labelled chessboard in 'train.txt'"),
 ])
 def test_invalid_training_files_change_nothing(workdir, capsys, content, network, message):
     (workdir / "train.txt").write_text(content)
