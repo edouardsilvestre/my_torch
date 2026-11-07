@@ -2,8 +2,12 @@
 
 import re
 import sys
+from collections import Counter
+from pathlib import Path
 
+from my_torch.config import Config, load_config
 from my_torch.errors import MyTorchError
+from my_torch.serialization import save_network
 
 PROGRAM = "my_torch_generator"
 EXIT_SUCCESS = 0
@@ -43,12 +47,44 @@ def parse_arguments(argv: list[str]) -> list[tuple[str, int]]:
     return [(argv[i], parse_count(argv[i + 1], argv[i])) for i in range(0, len(argv), 2)]
 
 
+def output_name(config_path: str, index: int) -> str:
+    """Name the file of the index-th network of a configuration, in the current directory."""
+    return f"{Path(config_path).stem}_{index}.nn"
+
+
+def network_seed(config: Config, index: int) -> int | None:
+    """Give each network of a configuration its own seed, so that they all differ."""
+    return None if config.seed is None else config.seed + index - 1
+
+
+def check_names(requests: list[tuple[str, int]]) -> None:
+    names = Counter(Path(config_path).stem for config_path, _ in requests)
+    for name, count in names.items():
+        if count > 1:
+            raise MyTorchError(
+                f"several configurations would save their networks as '{name}_<i>.nn'"
+            )
+
+
+def generate(config_path: str, config: Config, count: int) -> None:
+    for index in range(1, count + 1):
+        network = config.create_network(network_seed(config, index))
+        save_network(
+            output_name(config_path, index), network, config.create_loss(),
+            config.create_optimizer(), config.training_settings(),
+        )
+
+
 def run(argv: list[str]) -> None:
     """Run the generator with the given command line arguments."""
     if argv == ["--help"]:
         print(USAGE)
         return
-    parse_arguments(argv)
+    requests = parse_arguments(argv)
+    check_names(requests)
+    configs = [load_config(config_path) for config_path, _ in requests]
+    for (config_path, count), config in zip(requests, configs):
+        generate(config_path, config, count)
 
 
 def main(argv: list[str]) -> int:
