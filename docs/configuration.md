@@ -65,6 +65,10 @@ Les activations possibles sont `identity`, `sigmoid`, `tanh`, `relu`, `leaky_rel
 | `batch_size` | Oui | Entier strictement positif | - |
 | `shuffle` | Non | `true` ou `false` : mélange des données à chaque epoch | `true` |
 | `seed` | Non | Entier positif ou nul : graine du mélange | Aucune |
+| `l2` | Non | Nombre positif ou nul : force de la [régularisation L2](regularisation.md) | `0` |
+| `patience` | Non | Entier strictement positif : epochs sans progrès avant [l'early stopping](regularisation.md) | Aucune |
+| `monitor` | Non | `val_loss` ou `val_accuracy` : la mesure de validation que surveille l'early stopping | `val_loss` |
+| `validation_split` | Non | Part des positions que `--train` met de côté pour la validation, de 0 inclus à 1 exclu | `0` |
 
 Le nombre d'epochs et la taille de batch n'ont pas de valeur par défaut : une valeur choisie d'avance serait arbitraire, et elle dépend trop du problème.
 
@@ -116,7 +120,7 @@ save_network(
 
 - **`create_network(seed=None)`** crée un réseau vierge. Sans argument, il utilise la graine de la configuration. Une autre graine permet de créer plusieurs réseaux différents à partir de la même configuration.
 - **`create_optimizer()`** crée un nouvel optimiseur à chaque appel, car un optimiseur garde une mémoire propre à un réseau.
-- **`training_settings()`** donne `epochs`, `batch_size`, `shuffle` et `seed`. Ce sont les réglages enregistrés dans le [fichier .nn](format_nn.md), avec le coût et l'optimiseur.
+- **`training_settings()`** donne les huit réglages de `[training]` autres que le coût, avec leur valeur par défaut s'ils sont absents. Ce sont les réglages enregistrés dans le [fichier .nn](format_nn.md), avec le coût et l'optimiseur.
 
 ## Les deux graines
 

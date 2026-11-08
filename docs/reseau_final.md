@@ -13,10 +13,10 @@ $> ./scripts/build_network.sh
 1. **Préparer le dataset fourni avec le sujet,** `dataset.zip`, qui doit se trouver à la racine du dépôt. Les 723 019 positions sont rassemblées dans `datasets/official.txt`, comme l'explique [le document sur les données](dataset.md).
 2. **Le découper,** avec la graine 0, en 572 449 positions d'entraînement, 71 556 de validation et 71 554 de test. Les 7 460 positions en double sont retirées avant le découpage.
 3. **Créer un réseau vierge** depuis [configs/my_torch_network.conf](../configs/my_torch_network.conf), avec `my_torch_generator`.
-4. **L'entraîner** sur le jeu d'entraînement avec `my_torch_analyzer --train`, en 10 epochs.
+4. **L'entraîner** sur le jeu d'entraînement avec `my_torch_analyzer --train`, en 24 epochs, avec une régularisation L2 de 1e-4.
 5. **L'évaluer** sur la validation, puis sur le test.
 
-L'ensemble prend environ 18 minutes sur notre machine. Toutes les graines sont fixées, donc relancer le script redonne le même réseau. Le sujet exige de garder tous les scripts d'entraînement. `dataset.zip` n'est pas poussé : tout le monde le reçoit avec le sujet, et le sujet n'impose pas de pousser les datasets.
+L'ensemble prend environ 2 heures sur notre machine. Toutes les graines sont fixées, donc relancer le script redonne le même réseau. Le sujet exige de garder tous les scripts d'entraînement. `dataset.zip` n'est pas poussé : tout le monde le reçoit avec le sujet, et le sujet n'impose pas de pousser les datasets.
 
 ## Pourquoi le dataset fourni
 
@@ -48,35 +48,49 @@ $> python3 -m scripts.compare_configs --train datasets/official_train.txt \
 - **Le surapprentissage a beaucoup diminué.** Après 10 epochs, l'écart entre l'entraînement et la validation est de 10 à 13 points, contre 27 points avec nos 80 000 positions aléatoires. Avec beaucoup plus d'exemples, le réseau apprend moins par cœur.
 - **Les écarts entre configurations restent faibles,** moins d'un point. Le réseau le plus large plafonne dès l'epoch 6, alors que les deux autres progressent encore à l'epoch 10.
 
-**Le choix : `o3_256_256_64`, avec 10 epochs.** C'est la meilleure configuration sur toutes les mesures de validation, et elle est plus rapide que la plus large. Comme elle progresse encore à l'epoch 10, quelques epochs de plus aideraient peut-être un peu : ce n'est pas mesuré ici. Ce choix ne s'appuie que sur la validation, et **le jeu de test n'a servi qu'à la mesure finale**.
+**Le choix : `o3_256_256_64`.** C'est la meilleure configuration sur toutes les mesures de validation, et elle est plus rapide que la plus large. Ce choix ne s'appuie que sur la validation, et **le jeu de test n'a servi qu'à la mesure finale**.
+
+## Moins d'overfitting avec la régularisation L2
+
+Entraînée 10 epochs sans régularisation, cette configuration faisait 95,8 % sur l'entraînement mais 85,3 % sur la validation. [La régularisation L2 et l'early stopping](regularisation.md) ont ensuite été mesurés sur elle, toujours sur la validation :
+
+| `l2` | Epoch gardée par l'early stopping | Entraînement | Validation 5 classes | Écart |
+|---|---|---|---|---|
+| 0 | 10 | 95,8 % | 85,3 % | 10,5 points |
+| **0,0001** | **24** | 92,7 % | **89,1 %** | **3,6 points** |
+| 0,001 | 21 | 82,2 % | 80,6 % | 1,6 point |
+
+**Le réseau poussé utilise `l2 = 1e-4`, entraîné 24 epochs.** La pénalité empêche le réseau de retenir les positions d'entraînement, et il continue de progresser en validation bien plus longtemps. Avec `1e-3`, la pénalité est trop forte : le réseau n'apprend même plus bien l'entraînement.
+
+`--train` ne voit que le jeu d'entraînement : le réseau est donc réentraîné jusqu'à l'epoch 24, sans patience. Comme toutes les graines sont fixées, il est identique au réseau gardé par l'early stopping : sa validation est exactement la même, 89,07 %.
 
 ## Ce qu'il vaut
 
 Sur le **jeu de test du dataset fourni**, 71 554 positions que le réseau n'a jamais vues, avec la répartition du dataset (41,6 % de `Nothing`, 34,7 % d'échecs, 23,7 % de mats) :
 
-| Niveau du correcteur | Première version | Ce réseau |
-|---|---|---|
-| `Check` / `Nothing` | 71,6 % | **92,6 %** |
-| `Checkmate` / `Check` / `Nothing` | 53,6 % | **84,9 %** |
-| Avec les couleurs | 53,6 % | **84,9 %** |
+| Niveau du correcteur | Première version | Dataset fourni, sans L2 | Ce réseau |
+|---|---|---|---|
+| `Check` / `Nothing` | 71,6 % | 92,6 % | **95,0 %** |
+| `Checkmate` / `Check` / `Nothing` | 53,6 % | 84,9 % | **88,9 %** |
+| Avec les couleurs | 53,6 % | 84,9 % | **88,9 %** |
 
 **Par classe :**
 
 | Classe | Précision | Rappel | F1 |
 |---|---|---|---|
-| `Nothing` | 0,91 | 0,91 | 0,91 |
-| `Check White` | 0,82 | 0,80 | 0,81 |
-| `Check Black` | 0,77 | 0,79 | 0,78 |
-| `Checkmate White` | 0,81 | 0,84 | 0,83 |
-| `Checkmate Black` | 0,81 | 0,81 | 0,81 |
+| `Nothing` | 0,95 | 0,93 | 0,94 |
+| `Check White` | 0,87 | 0,84 | 0,86 |
+| `Check Black` | 0,85 | 0,83 | 0,84 |
+| `Checkmate White` | 0,83 | 0,89 | 0,86 |
+| `Checkmate Black` | 0,83 | 0,89 | 0,86 |
 
-- **Toutes les classes progressent,** surtout `Nothing`, dont le rappel passe de 43 % à 91 %.
-- **Les couleurs ne sont presque jamais confondues :** 3 erreurs sur 41 798 échecs et mats.
-- **La difficulté principale reste de séparer un échec d'un mat :** 2 859 échecs sont pris pour des mats, et 2 645 mats pour des échecs.
+- **Toutes les classes progressent** par rapport au réseau sans L2, de 3 à 6 points de F1.
+- **Les couleurs ne sont jamais confondues :** aucune erreur de couleur sur 41 798 échecs et mats.
+- **La difficulté principale reste de séparer un échec d'un mat :** 2 703 échecs sont pris pour des mats, et 1 663 mats pour des échecs, contre 2 859 et 2 645 sans L2.
 
-Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux que la première version : 74,1 % contre 71,8 % avec les couleurs.
+Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 80,7 % avec les couleurs, contre 74,1 % sans L2 et 71,8 % pour la première version.
 
-**Sur les 5 positions de l'exemple du sujet,** il en trouve 3. Il prend le mat du fou pour `Check Black`, et la position avec seulement les deux rois pour `Check Black`, alors qu'il n'y a rien. La première version les trouvait toutes les 5. Ces 5 positions pèsent peu face aux 71 554 du jeu de test, mais elles montrent que des erreurs restent possibles sur des positions simples.
+**Sur les 5 positions de l'exemple du sujet,** il en trouve 4. Il prend toujours le mat du fou pour `Check Black`, mais il ne voit plus d'échec dans la position avec seulement les deux rois. La première version les trouvait toutes les 5. Ces 5 positions pèsent peu face aux 71 554 du jeu de test, mais elles montrent que des erreurs restent possibles sur des positions simples.
 
 ## Le fichier poussé
 
@@ -91,6 +105,6 @@ Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux que la
 
 ## Les limites et la suite
 
-- **Un écart d'environ 10 points** entre l'entraînement et la validation. La régularisation, l'arrêt de l'entraînement au bon moment et le dropout sont prévus pour le réduire.
+- **Un écart de 3,6 points** entre l'entraînement et la validation, contre 10,5 sans régularisation. Le dropout est prévu pour le réduire encore.
 - **Des positions inconnues.** Les fichiers du correcteur ne sont pas exactement le dataset fourni : sa précision peut différer de celle mesurée ici.
 - **Le format aux niveaux simples.** Le réseau répond toujours avec les couleurs. Le premier essai suggère que le correcteur les accepte, mais ce n'est pas certain.
