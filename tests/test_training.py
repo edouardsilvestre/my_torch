@@ -89,9 +89,9 @@ def test_targets_stay_paired_with_their_inputs():
     network = Network(1, [(1, "identity")], seed=0)
     original_forward = network.forward
 
-    def forward(inputs):
+    def forward(inputs, dropout_rng=None):
         loss.inputs = inputs
-        return original_forward(inputs)
+        return original_forward(inputs, dropout_rng)
 
     network.forward = forward
     train(network, loss, get_optimizer("sgd"), INDEX_INPUTS, INDEX_TARGETS, 2, 3, seed=0)
