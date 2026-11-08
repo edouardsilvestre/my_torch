@@ -21,6 +21,8 @@ OPTIMIZER_PREFIX = "optimizer/"
 METADATA_FIELDS = {
     "format", "version", "input_size", "architecture", "loss", "optimizer", "settings",
 }
+# Added after the first files were written: a file without it has no dropout.
+OPTIONAL_METADATA_FIELDS = {"dropout"}
 
 
 @dataclass
@@ -58,6 +60,7 @@ def save_network(
         "version": FORMAT_VERSION,
         "input_size": network.input_size,
         "architecture": [[size, activation] for size, activation in network.architecture],
+        "dropout": network.dropout,
         "loss": None if loss is None else loss_name(loss),
         "optimizer": None if optimizer is None else {
             "name": optimizer_name(optimizer),
@@ -108,7 +111,7 @@ def load_network(path: str) -> SavedNetwork:
     try:
         metadata = read_metadata(arrays.pop(METADATA_KEY, None))
         architecture = [(size, activation) for size, activation in metadata["architecture"]]
-        network = Network(metadata["input_size"], architecture)
+        network = Network(metadata["input_size"], architecture, dropout=metadata.get("dropout"))
         read_layers(network, arrays)
         loss = None if metadata["loss"] is None else get_loss(metadata["loss"])
         optimizer = read_optimizer(metadata["optimizer"], network, arrays)
@@ -157,9 +160,12 @@ def read_metadata(array: np.ndarray | None) -> dict[str, Any]:
         raise MyTorchError(
             f"unsupported format version {metadata.get('version')!r}, expected {FORMAT_VERSION}"
         )
-    if set(metadata) != METADATA_FIELDS:
+    if not METADATA_FIELDS <= set(metadata) <= METADATA_FIELDS | OPTIONAL_METADATA_FIELDS:
         fields = ", ".join(sorted(METADATA_FIELDS))
-        raise MyTorchError(f"description must hold exactly: {fields}")
+        optional = ", ".join(sorted(OPTIONAL_METADATA_FIELDS))
+        raise MyTorchError(f"description must hold exactly: {fields}, and optionally {optional}")
+    if "dropout" in metadata and not isinstance(metadata["dropout"], list):
+        raise MyTorchError("dropout must be a list of rates, one per layer")
     if not is_count(metadata["input_size"]):
         raise MyTorchError("input size must be a positive integer")
     architecture = metadata["architecture"]
