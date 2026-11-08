@@ -26,16 +26,17 @@ def reduce_classes(
     return np.array(mapping, dtype=np.int64)[indices]
 
 
-def evaluate(network_path: str, chess_path: str) -> list[LevelMetrics]:
+def evaluate(network_path: str, chess_path: str, mc_passes: int = 0) -> list[LevelMetrics]:
     """Compare the predictions of a network with the labels of a file.
 
     The metrics are given with the classes of the network, then with each simpler set of
     classes: a network with colors is also evaluated as if it had 3, then 2 classes.
+    With mc_passes, the predictions are those of MC dropout.
     """
     network, classes = load_chess_network(network_path)
     inputs, targets = read_training_data(chess_path, classes)
-    return evaluate_predictions(np.argmax(targets, axis=1), predict_classes(network, inputs),
-                                classes)
+    predicted = predict_classes(network, inputs, mc_passes)
+    return evaluate_predictions(np.argmax(targets, axis=1), predicted, classes)
 
 
 def evaluate_predictions(
