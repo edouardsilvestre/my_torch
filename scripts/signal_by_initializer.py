@@ -41,11 +41,10 @@ def plot(table: dict[str, list[float]], output: Path) -> None:
     axis.set_facecolor(SURFACE)
     for color, (name, values) in zip(COLORS, table.items()):
         layers = range(1, len(values) + 1)
-        axis.plot(layers, values, color=color, linewidth=2, marker="o", markersize=5)
-        axis.annotate(name, (len(values), values[-1]), xytext=(8, 0), textcoords="offset points",
-                      va="center", fontsize=9, color=INK)
+        axis.plot(layers, values, color=color, linewidth=2, marker="o", markersize=5, label=name)
+    # lecun and xavier give the same variance on square layers: a legend keeps both readable.
+    axis.legend(frameon=False, labelcolor=INK, fontsize=9, loc="lower left")
     axis.set_yscale("log")
-    axis.set_xlim(1, len(next(iter(table.values()))) + 2.5)
     axis.set_title("Variance before activation, 10 ReLU layers of 500 neurons", loc="left",
                    color=INK, fontsize=12)
     axis.set_xlabel("Layer", color=MUTED)
