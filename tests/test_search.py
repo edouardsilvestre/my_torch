@@ -327,3 +327,25 @@ def test_an_invalid_space_stops_with_a_message(files):
     with pytest.raises(SystemExit) as error:
         run(files, "random", "--trials", "1")
     assert "unknown hyperparameter 'momentum'" in str(error.value.code)
+
+
+def test_the_best_score_so_far_never_goes_down():
+    from scripts.plot_search import best_so_far
+    assert best_so_far([0.5, 0.4, 0.7, 0.6, 0.8]) == [0.5, 0.5, 0.7, 0.7, 0.8]
+
+
+def test_the_progress_of_searches_is_drawn(files, capsys):
+    pytest.importorskip("matplotlib")
+    from scripts.plot_search import main as plot_main
+    run(files, "random", "--trials", "2")
+    capsys.readouterr()
+    plot_main(["--output", str(files / "search.png"), str(files / "trials.jsonl")])
+    assert capsys.readouterr().out == f"{files / 'search.png'}: 1 searches\n"
+    assert (files / "search.png").read_bytes().startswith(b"\x89PNG")
+
+
+def test_a_search_without_trials_is_refused(tmp_path):
+    from scripts.plot_search import main as plot_main
+    with pytest.raises(SystemExit) as error:
+        plot_main(["--output", str(tmp_path / "x.png"), str(tmp_path / "none.jsonl")])
+    assert "no trial" in str(error.value.code)
