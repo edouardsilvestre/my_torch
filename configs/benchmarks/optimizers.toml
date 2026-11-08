@@ -1,0 +1,8 @@
+# Benchmark des optimiseurs, chacun avec un learning rate habituel (docs/benchmarks.md).
+title = "Optimiseurs"
+
+[variants]
+sgd = { optimizer = { name = "sgd", learning_rate = 0.05 } }
+momentum = { optimizer = { name = "momentum", learning_rate = 0.01, momentum = 0.9 } }
+rmsprop = { optimizer = { name = "rmsprop", learning_rate = 0.001 } }
+adam = { optimizer = { name = "adam", learning_rate = 0.001 } }
