@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scripts.plot_history import COLORS, kept_epoch, main as plot_main
+from scripts.plot_history import COLORS, kept_epoch, learning_rates, main as plot_main
 
 HISTORY = {"loss": [0.9, 0.5, 0.4], "accuracy": [0.4, 0.7, 0.8],
            "val_loss": [0.95, 0.6, 0.7], "val_accuracy": [0.35, 0.65, 0.6]}
@@ -24,6 +24,24 @@ def test_curves_are_drawn_into_an_image(tmp_path, capsys):
     plot_main(["--json", str(source), "--output", str(output), "--title", "Test"])
     assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert capsys.readouterr().out == f"{output}: 2 configurations\n"
+
+
+def test_curves_with_learning_rates_are_drawn(tmp_path):
+    pytest.importorskip("matplotlib")
+    planned = {**HISTORY, "learning_rate": [0.01, 0.005, 0.0025]}
+    results = [{"config": "fixed.conf", "history": HISTORY, "learning_rate": 0.01},
+               {"config": "step.conf", "history": planned}]
+    output = tmp_path / "curves.png"
+    plot_main(["--json", str(write_results(tmp_path / "results.json", results)), "--output",
+               str(output)])
+    assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_learning_rates_are_planned_fixed_or_unknown():
+    planned = {**HISTORY, "learning_rate": [0.1, 0.05, 0.025]}
+    assert learning_rates({"history": planned, "learning_rate": 0.1}) == [0.1, 0.05, 0.025]
+    assert learning_rates({"history": HISTORY, "learning_rate": 0.1}) == [0.1, 0.1, 0.1]
+    assert learning_rates({"history": HISTORY}) is None
 
 
 def test_the_kept_epoch_is_the_last_one_without_early_stopping():

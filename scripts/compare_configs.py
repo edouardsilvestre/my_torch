@@ -67,6 +67,7 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
         "validation_macro_f1": levels[0].metrics.macro.f1,
         "best_epoch": best_epoch,
         "best_validation_accuracy": history["val_accuracy"][best_epoch - 1],
+        "learning_rate": optimizer.learning_rate,
         "history": history,
     }
 

@@ -128,6 +128,8 @@ def test_the_schedule_of_a_configuration_is_used(files):
     run(files, "scheduled.conf", json_name="results.json")
     history = json.loads((files / "results.json").read_text())[0]["history"]
     assert history["learning_rate"] == [0.01] * 50 + [0.005] * 50
+    # The result keeps the learning rate of the configuration, the one the schedule starts from.
+    assert json.loads((files / "results.json").read_text())[0]["learning_rate"] == 0.01
 
 
 def test_train_accuracy_is_the_one_of_the_kept_epoch(files, monkeypatch):
