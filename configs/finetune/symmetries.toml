@@ -1,0 +1,13 @@
+# Suite de l'entraînement d'un réseau déjà entraîné, sur ses positions multipliées par les
+# symétries de l'échiquier (docs/reseau_final.md), avec le petit learning rate de sa fin.
+
+[training]
+epochs = 4
+batch_size = 64
+seed = 0
+l2 = 0.0001
+patience = 1
+monitor = "val_accuracy"
+
+[optimizer]
+learning_rate = 0.00025
