@@ -21,7 +21,7 @@ SUBJECT_FENS = [
     "8/8/8/8/8/8/8/k1K5 w - - 0 1",
 ]
 SUBJECT_FULL_OUTPUT = ["Checkmate Black", "Nothing", "Nothing", "Check White", "Nothing"]
-TRAINING_POSITIONS = 572449
+TRAINING_POSITIONS = 715559
 
 
 def test_the_pushed_network_has_the_name_required_by_the_subject():
