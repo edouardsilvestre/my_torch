@@ -38,12 +38,13 @@ class Config:
     patience: int | None = None
     monitor: str = DEFAULT_MONITOR
     validation_split: float = 0.0
+    dropout: list[float] | None = None
 
     def create_network(self, seed: int | None = None) -> Network:
         """Create a blank network, with the seed of the configuration unless another is given."""
         return Network(
             self.input_size, self.layers, self.initializer,
-            self.seed if seed is None else seed,
+            self.seed if seed is None else seed, self.dropout,
         )
 
     def create_loss(self) -> Loss:
@@ -126,24 +127,35 @@ def optimizer_parameters(name: str) -> dict[str, type]:
     }
 
 
-def read_network(table: Any) -> tuple[int, list[tuple[int, str]], str, int | None]:
+def read_network(
+    table: Any,
+) -> tuple[int, list[tuple[int, str]], str, int | None, list[float]]:
     check_keys(table, "network", {"input_size", "layers"}, {"initializer", "seed"})
     input_size = read_count(table["input_size"], "network.input_size")
     layers = table["layers"]
     if not isinstance(layers, list) or not layers:
         raise MyTorchError("network.layers must be a non-empty list of layers")
-    architecture = []
+    architecture, dropout = [], []
     for index, layer in enumerate(layers):
         where = f"network.layers[{index}]"
-        check_keys(layer, where, {"size", "activation"}, set())
+        check_keys(layer, where, {"size", "activation"}, {"dropout"})
         architecture.append((
             read_count(layer["size"], f"{where}.size"),
             read_name(layer["activation"], f"{where}.activation", ACTIVATIONS),
         ))
+        dropout.append(read_number(layer.get("dropout", 0.0), f"{where}.dropout"))
+        if not 0 <= dropout[-1] < 1:
+            raise MyTorchError(f"{where}.dropout must be in [0, 1[, got {dropout[-1]}")
+    if dropout[-1]:
+        raise MyTorchError(
+            f"network.layers[{len(layers) - 1}].dropout: the last layer cannot have dropout, "
+            "its outputs are the scores"
+        )
     initializer = read_name(
         table.get("initializer", DEFAULT_INITIALIZER), "network.initializer", INITIALIZERS
     )
-    return input_size, architecture, initializer, read_seed(table.get("seed"), "network.seed")
+    seed = read_seed(table.get("seed"), "network.seed")
+    return input_size, architecture, initializer, seed, dropout
 
 
 def read_training(table: Any, where: str = "training", with_loss: bool = True) -> dict[str, Any]:
@@ -206,7 +218,7 @@ def read_optimizer(table: Any) -> tuple[str, dict[str, float | bool]]:
 def parse_config(data: Any) -> Config:
     """Check the content of a configuration and return it in a validated form."""
     check_keys(data, "configuration", {"network", "training", "optimizer"}, set())
-    input_size, layers, initializer, seed = read_network(data["network"])
+    input_size, layers, initializer, seed, dropout = read_network(data["network"])
     training = read_training(data["training"])
     optimizer, optimizer_params = read_optimizer(data["optimizer"])
     if training["loss"] == "cross_entropy" and layers[-1][1] != "identity":
@@ -218,6 +230,7 @@ def parse_config(data: Any) -> Config:
         input_size, layers, initializer, seed, training["loss"], optimizer, optimizer_params,
         training["epochs"], training["batch_size"], training["shuffle"], training["seed"],
         training["l2"], training["patience"], training["monitor"], training["validation_split"],
+        dropout,
     )
 
 

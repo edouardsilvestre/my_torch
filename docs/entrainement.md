@@ -109,7 +109,8 @@ L'affichage est désactivé par défaut. Il n'est utile que pendant un entraîne
 - que la validation ne change rien à l'apprentissage ;
 - les valeurs de l'historique, le calcul par morceaux et l'affichage ;
 - que le coût diminue et que le réseau apprend XOR, en batch complet, en mini-batch et en stochastique ;
-- la régularisation L2 et l'early stopping, décrits dans [leur propre document](regularisation.md).
+- la régularisation L2 et l'early stopping, décrits dans [leur propre document](regularisation.md) ;
+- le dropout, décrit dans [son propre document](dropout.md).
 
 Pour vérifier les tests eux-mêmes, 30 erreurs ont été introduites volontairement dans la boucle, et chacune a fait échouer au moins un test.
 
@@ -120,5 +121,4 @@ Ces tests se lancent avec `make tests_run`.
 La boucle est prévue pour accueillir plus tard :
 
 - l'arrêt propre d'un long entraînement avec Ctrl+C ;
-- le dropout, actif seulement pendant l'apprentissage ;
 - un learning rate qui évolue au fil des epochs.

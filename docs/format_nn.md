@@ -34,6 +34,7 @@ Voici la description d'un réseau `768 → 256 → 64 → 3` entraîné avec Ada
     "version": 1,
     "input_size": 768,
     "architecture": [[256, "relu"], [64, "relu"], [3, "identity"]],
+    "dropout": [0.2, 0.2, 0.0],
     "loss": "cross_entropy",
     "optimizer": {
         "name": "adam",
@@ -45,6 +46,8 @@ Voici la description d'un réseau `768 → 256 → 64 → 3` entraîné avec Ada
 ```
 
 Les réglages de `settings` sont ceux de la section `[training]` du [fichier de configuration](configuration.md), sans le coût, qui est enregistré à part. Un fichier plus ancien, qui n'a que les quatre premiers réglages, se charge toujours : les réglages absents prennent leur valeur par défaut, qui ne change rien à l'entraînement.
+
+`dropout` donne le taux de [dropout](dropout.md) de chaque couche. Un fichier écrit avant l'ajout du dropout n'a pas ce champ : il se charge sans dropout.
 
 ## Ce qui est nécessaire, et ce qui ne l'est pas
 

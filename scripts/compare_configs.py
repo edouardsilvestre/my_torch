@@ -18,7 +18,7 @@ from analyzer.errors import AnalyzerError
 from analyzer.evaluate import evaluate_predictions
 from analyzer.predict import check_chess_network, predict_classes
 from analyzer.train import read_training_data
-from my_torch import MyTorchError, load_config, train
+from my_torch import MyTorchError, load_config, save_network, train
 
 
 def kept_epoch(history: dict, patience: int | None, monitor: str) -> int:
@@ -30,8 +30,12 @@ def kept_epoch(history: dict, patience: int | None, monitor: str) -> int:
     return int(choose(history[monitor])) + 1
 
 
-def compare(config_path: Path, train_path: str, validation_path: str, cache: dict) -> dict:
-    """Train the network of a configuration, and measure it on the validation set."""
+def compare(config_path: Path, train_path: str, validation_path: str, cache: dict,
+            save_dir: Path | None = None) -> dict:
+    """Train the network of a configuration, and measure it on the validation set.
+
+    With save_dir, the trained network, the one of the kept epoch, is also saved there under
+    the name of its configuration, ready for --train or an evaluation."""
     config = load_config(config_path)
     network = config.create_network()
     classes = check_chess_network(network)
@@ -40,13 +44,17 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
                           read_training_data(validation_path, classes))
     (inputs, targets), (validation_inputs, validation_targets) = cache[classes]
     start = time.perf_counter()
+    loss, optimizer = config.create_loss(), config.create_optimizer()
     history = train(
-        network, config.create_loss(), config.create_optimizer(), inputs, targets,
+        network, loss, optimizer, inputs, targets,
         config.epochs, config.batch_size, config.shuffle, config.training_seed,
         validation=(validation_inputs, validation_targets), verbose=True, l2=config.l2,
         patience=config.patience, monitor=config.monitor,
     )
     seconds = time.perf_counter() - start
+    if save_dir is not None:
+        save_network(save_dir / f"{config_path.stem}.nn", network, loss, optimizer,
+                     config.training_settings())
     levels = evaluate_predictions(np.argmax(validation_targets, axis=1),
                                   predict_classes(network, validation_inputs), classes)
     best_epoch = int(np.argmax(history["val_accuracy"])) + 1
@@ -87,6 +95,8 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--train", required=True, help="labelled training chessboards")
     parser.add_argument("--validation", required=True, help="labelled validation chessboards")
     parser.add_argument("--json", type=Path, help="also write the results and histories here")
+    parser.add_argument("--save", type=Path, metavar="DIR",
+                        help="also save each trained network there, as <configuration>.nn")
     parser.add_argument("configs", nargs="+", type=Path, help="configuration files to compare")
     return parser.parse_args(argv)
 
@@ -94,10 +104,13 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str]) -> None:
     arguments = parse_arguments(argv)
     results, cache = [], {}
+    if arguments.save:
+        arguments.save.mkdir(parents=True, exist_ok=True)
     for config_path in arguments.configs:
         print(f"{config_path}:", flush=True)
         try:
-            result = compare(config_path, arguments.train, arguments.validation, cache)
+            result = compare(config_path, arguments.train, arguments.validation, cache,
+                             arguments.save)
         except (AnalyzerError, MyTorchError) as error:
             sys.exit(f"compare_configs: {config_path}: {error}")
         results.append(result)

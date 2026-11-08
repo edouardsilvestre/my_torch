@@ -123,6 +123,9 @@ def train(
     that many epochs. The network and the optimizer then go back to the best epoch. The
     history keeps every epoch that was run.
 
+    Dropout, when the network has some, is only active on the batches of training: the
+    metrics are measured with every neuron.
+
     Return the history of the metrics measured at the end of each epoch.
     """
     inputs, targets = np.asarray(inputs), np.asarray(targets)
@@ -135,13 +138,19 @@ def train(
     check_l2(l2)
     check_early_stopping(patience, monitor, validation)
     rng = np.random.default_rng(seed)
+    # The masks of dropout get their own generator, so that the order of the examples
+    # stays the same with or without dropout.
+    dropout_rng = (
+        np.random.default_rng(np.random.SeedSequence(seed, spawn_key=(1,)))
+        if any(network.dropout) else None
+    )
     history: dict[str, list[float]] = {}
     best_value, best_epoch, best = None, 0, None
     for epoch in range(1, epochs + 1):
         order = rng.permutation(len(inputs)) if shuffle else np.arange(len(inputs))
         for start in range(0, len(inputs), batch_size):
             batch = order[start:start + batch_size]
-            outputs = network.forward(inputs[batch])
+            outputs = network.forward(inputs[batch], dropout_rng)
             network.backward(loss.backward(outputs, targets[batch]))
             if l2:
                 for layer in network.layers:

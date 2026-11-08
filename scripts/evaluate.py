@@ -54,20 +54,23 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--network", required=True, help=".nn file of the network")
     parser.add_argument("--chessboards", required=True, help="file of labelled chessboards")
     parser.add_argument("--json", type=Path, help="also write the metrics to this JSON file")
+    parser.add_argument("--mc-passes", type=int, default=0, metavar="N",
+                        help="predict with MC dropout: the mean of N passes with dropout active")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str]) -> None:
     arguments = parse_arguments(argv)
     try:
-        levels = evaluate(arguments.network, arguments.chessboards)
+        levels = evaluate(arguments.network, arguments.chessboards, arguments.mc_passes)
     except (AnalyzerError, MyTorchError) as error:
         sys.exit(f"evaluate: {error}")
-    print(f"Network {arguments.network} on {arguments.chessboards}\n")
+    mode = f" with MC dropout ({arguments.mc_passes} passes)" if arguments.mc_passes else ""
+    print(f"Network {arguments.network} on {arguments.chessboards}{mode}\n")
     print("\n\n".join(format_level(level) for level in levels))
     if arguments.json:
         report = {"network": arguments.network, "chessboards": arguments.chessboards,
-                  "levels": [to_json(level) for level in levels]}
+                  "mc_passes": arguments.mc_passes, "levels": [to_json(level) for level in levels]}
         arguments.json.write_text(json.dumps(report, indent=2) + "\n")
 
 

@@ -282,7 +282,7 @@ def replaced(arrays, key, change):
     (lambda a: with_metadata(a, input_size=True), "input size"),
     (lambda a: with_metadata(a, input_size=3), "layers/0/weights"),
     (lambda a: with_metadata(a, architecture=[]), "at least one layer"),
-    (lambda a: with_metadata(a, architecture=[[4, "tanh"], [3, "relu"]]),
+    (lambda a: with_metadata(a, architecture=[[4, "tanh"], [3, "relu"]], dropout=[0, 0]),
      "without a matching layer"),
     (lambda a: with_metadata(a, architecture=[[4, "tanh"], [3, "relu"], [2, "softplus"]]),
      "unknown activation"),

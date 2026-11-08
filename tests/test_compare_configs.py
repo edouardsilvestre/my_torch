@@ -2,9 +2,13 @@
 
 import json
 
+import numpy as np
 import pytest
 
 import scripts.compare_configs as compare_configs
+from analyzer.predict import check_chess_network
+from analyzer.train import read_training_data
+from my_torch import load_config, load_network
 from scripts.compare_configs import kept_epoch, main as compare_main
 
 FENS = [
@@ -45,11 +49,13 @@ def files(tmp_path):
     return tmp_path
 
 
-def run(files, *configs, json_name=None):
+def run(files, *configs, json_name=None, save=None):
     arguments = ["--train", str(files / "train.txt"), "--validation",
                  str(files / "validation.txt")]
     if json_name:
         arguments += ["--json", str(files / json_name)]
+    if save:
+        arguments += ["--save", str(files / save)]
     compare_main(arguments + [str(files / config) for config in configs])
 
 
@@ -91,6 +97,27 @@ def test_early_stopping_of_a_configuration_is_used(files):
     assert len(history["val_accuracy"]) == result["best_epoch"] + 3 < 100
     assert result["kept_epoch"] == result["best_epoch"]
     assert result["train_accuracy"] == history["accuracy"][result["kept_epoch"] - 1]
+
+
+def test_the_kept_networks_can_be_saved(files):
+    stopping = 'seed = 0\npatience = 3\nmonitor = "val_accuracy"\n\n[optimizer]'
+    early = CONFIG.format(hidden=32, outputs=5).replace("seed = 0\n\n[optimizer]", stopping)
+    (files / "early.conf").write_text(early)
+    run(files, "early.conf", "plain.conf", json_name="results.json", save="networks/new")
+    results = json.loads((files / "results.json").read_text())
+    assert sorted(path.name for path in (files / "networks" / "new").iterdir()) == [
+        "early.nn", "plain.nn"]
+    for result, name in zip(results, ["early", "plain"]):
+        saved = load_network(files / "networks" / "new" / f"{name}.nn")
+        config = load_config(files / f"{name}.conf")
+        assert saved.settings == config.training_settings()
+        # One batch per epoch: the saved network is the one of the kept epoch.
+        assert saved.optimizer.steps == result["kept_epoch"]
+        classes = check_chess_network(saved.network)
+        inputs, targets = read_training_data(files / "validation.txt", classes)
+        accuracy = np.mean(saved.network.predict(inputs) == targets.argmax(axis=1))
+        assert accuracy == result["validation_accuracy"][str(len(classes))]
+    assert results[0]["kept_epoch"] < 100
 
 
 def test_train_accuracy_is_the_one_of_the_kept_epoch(files, monkeypatch):
