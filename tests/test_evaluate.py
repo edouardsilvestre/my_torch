@@ -8,6 +8,7 @@ import pytest
 from analyzer.errors import AnalyzerError
 from analyzer.evaluate import evaluate, reduce_classes
 from analyzer.labels import CLASS_SETS
+from analyzer.predict import predict_classes
 from my_torch import Network, get_loss, get_optimizer, save_network, train
 from analyzer.train import read_training_data
 from scripts.evaluate import main as evaluate_main
@@ -135,3 +136,39 @@ def test_script_error_exits_with_a_message(files):
         evaluate_main(["--network", str(files / "missing.nn"), "--chessboards",
                        str(files / "test.txt")])
     assert "evaluate: cannot load network: no such file" in str(error.value.code)
+
+
+def test_mc_dropout_report(files, capsys):
+    inputs, targets = read_training_data(files / "test.txt", CLASS_SETS[5])
+    network = Network(769, [(64, "relu"), (5, "identity")], seed=2, dropout=[0.8, 0.0])
+    save_network(files / "dropout.nn", network)
+    expected = predict_classes(network, inputs, 3)
+    # Chosen so that MC dropout and a single pass without dropout disagree here.
+    assert not np.array_equal(expected, predict_classes(network, inputs))
+    output = files / "report.json"
+    evaluate_main(["--network", str(files / "dropout.nn"), "--chessboards",
+                   str(files / "test.txt"), "--json", str(output), "--mc-passes", "3"])
+    assert "dropout.nn on " in capsys.readouterr().out.splitlines()[0]
+    report = json.loads(output.read_text())
+    assert report["mc_passes"] == 3
+    accuracy = np.mean(expected == np.argmax(targets, axis=1))
+    assert report["levels"][0]["accuracy"] == pytest.approx(accuracy)
+
+
+def test_mc_dropout_report_header(files, capsys):
+    network = Network(769, [(8, "relu"), (5, "identity")], seed=0, dropout=[0.5, 0.0])
+    save_network(files / "dropout.nn", network)
+    evaluate_main(["--network", str(files / "dropout.nn"), "--chessboards",
+                   str(files / "test.txt"), "--mc-passes", "4"])
+    assert capsys.readouterr().out.splitlines()[0].endswith(" with MC dropout (4 passes)")
+
+
+@pytest.mark.parametrize("passes, message", [
+    ("3", "MC dropout needs a network with dropout"),
+    ("-1", "passes must be a positive integer"),
+])
+def test_invalid_mc_dropout_evaluation(files, passes, message):
+    with pytest.raises(SystemExit) as error:
+        evaluate_main(["--network", str(files / "learned.nn"), "--chessboards",
+                       str(files / "test.txt"), "--mc-passes", passes])
+    assert message in str(error.value.code)
