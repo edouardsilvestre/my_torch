@@ -1,0 +1,12 @@
+# Suite de l'entraînement du réseau entraîné sur tout le dataset, sur tout le dataset multiplié
+# par les symétries de l'échiquier : mesurée, mais pas retenue (docs/reseau_final.md). Sans
+# validation, 2 epochs, comme la même suite sur le jeu d'entraînement.
+
+[training]
+epochs = 2
+batch_size = 64
+seed = 0
+l2 = 0.0001
+
+[optimizer]
+learning_rate = 0.00025
