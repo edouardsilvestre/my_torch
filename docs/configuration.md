@@ -50,11 +50,13 @@ TOML est le seul des trois qui accepte les commentaires et distingue les types. 
 | Clé | Obligatoire | Valeur | Par défaut |
 |---|---|---|---|
 | `input_size` | Oui | Entier strictement positif | - |
-| `layers` | Oui | Liste non vide de couches `{ size = <entier>, activation = "<nom>" }` | - |
+| `layers` | Oui | Liste non vide de couches `{ size = <entier>, activation = "<nom>" }`, avec un `dropout = <taux>` facultatif | - |
 | `initializer` | Non | `uniform`, `normal`, `lecun`, `xavier_uniform`, `xavier_normal` ou `he` | `he` |
 | `seed` | Non | Entier positif ou nul : graine des poids de départ | Aucune |
 
 Les activations possibles sont `identity`, `sigmoid`, `tanh`, `relu`, `leaky_relu` et `softmax`.
+
+Le `dropout` d'une couche est la part de ses neurones éteints au hasard à chaque batch d'entraînement, de 0 inclus à 1 exclu, et 0 par défaut. La dernière couche ne peut pas en avoir : ses sorties sont les scores. [Le document sur le dropout](dropout.md) explique son rôle.
 
 ### `[training]`
 
@@ -147,4 +149,4 @@ Ces tests se lancent avec `make tests_run`.
 
 ## Ce qui viendra
 
-La régularisation, le dropout et le learning rate variable ajouteront leurs propres clés au format. Comme toute clé inconnue est refusée, aucune de ces clés n'est encore acceptée.
+Le learning rate variable ajoutera ses propres clés au format. Comme toute clé inconnue est refusée, elles ne sont pas encore acceptées.

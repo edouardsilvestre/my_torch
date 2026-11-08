@@ -105,6 +105,6 @@ Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 80,7
 
 ## Les limites et la suite
 
-- **Un écart de 3,6 points** entre l'entraînement et la validation, contre 10,5 sans régularisation. Le dropout est prévu pour le réduire encore.
+- **Un écart de 3,6 points** entre l'entraînement et la validation, contre 10,5 sans régularisation. [Le dropout](dropout.md) le réduit encore, mais fait aussi baisser la validation : il n'est pas utilisé.
 - **Des positions inconnues.** Les fichiers du correcteur ne sont pas exactement le dataset fourni : sa précision peut différer de celle mesurée ici.
 - **Le format aux niveaux simples.** Le réseau répond toujours avec les couleurs. Le premier essai suggère que le correcteur les accepte, mais ce n'est pas certain.
