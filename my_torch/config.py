@@ -12,9 +12,11 @@ from my_torch.initializers import INITIALIZERS
 from my_torch.losses import LOSSES, Loss, get_loss
 from my_torch.network import Network
 from my_torch.optimizers import OPTIMIZERS, Optimizer, get_optimizer
+from my_torch.training import MONITORED
 
 DEFAULT_INITIALIZER = "he"
 DEFAULT_SHUFFLE = True
+DEFAULT_MONITOR = "val_loss"
 
 
 @dataclass
@@ -32,6 +34,10 @@ class Config:
     batch_size: int
     shuffle: bool
     training_seed: int | None
+    l2: float = 0.0
+    patience: int | None = None
+    monitor: str = DEFAULT_MONITOR
+    validation_split: float = 0.0
 
     def create_network(self, seed: int | None = None) -> Network:
         """Create a blank network, with the seed of the configuration unless another is given."""
@@ -54,6 +60,10 @@ class Config:
             "batch_size": self.batch_size,
             "shuffle": self.shuffle,
             "seed": self.training_seed,
+            "l2": self.l2,
+            "patience": self.patience,
+            "monitor": self.monitor,
+            "validation_split": self.validation_split,
         }
 
 
@@ -138,13 +148,29 @@ def read_network(table: Any) -> tuple[int, list[tuple[int, str]], str, int | Non
 
 def read_training(table: Any, where: str = "training", with_loss: bool = True) -> dict[str, Any]:
     required = {"epochs", "batch_size"} | ({"loss"} if with_loss else set())
-    check_keys(table, where, required, {"shuffle", "seed"})
+    optional = {"shuffle", "seed", "l2", "patience", "monitor", "validation_split"}
+    check_keys(table, where, required, optional)
+    patience = table.get("patience")
     training = {
         "epochs": read_count(table["epochs"], f"{where}.epochs"),
         "batch_size": read_count(table["batch_size"], f"{where}.batch_size"),
         "shuffle": read_bool(table.get("shuffle", DEFAULT_SHUFFLE), f"{where}.shuffle"),
         "seed": read_seed(table.get("seed"), f"{where}.seed"),
+        "l2": read_number(table.get("l2", 0.0), f"{where}.l2"),
+        "patience": None if patience is None else read_count(patience, f"{where}.patience"),
+        "monitor": read_name(
+            table.get("monitor", DEFAULT_MONITOR), f"{where}.monitor", MONITORED
+        ),
+        "validation_split": read_number(
+            table.get("validation_split", 0.0), f"{where}.validation_split"
+        ),
     }
+    if training["l2"] < 0:
+        raise MyTorchError(f"{where}.l2 must not be negative, got {training['l2']}")
+    if not 0 <= training["validation_split"] < 1:
+        raise MyTorchError(
+            f"{where}.validation_split must be in [0, 1[, got {training['validation_split']}"
+        )
     if with_loss:
         training["loss"] = read_name(table["loss"], f"{where}.loss", LOSSES)
     return training
@@ -191,6 +217,7 @@ def parse_config(data: Any) -> Config:
     return Config(
         input_size, layers, initializer, seed, training["loss"], optimizer, optimizer_params,
         training["epochs"], training["batch_size"], training["shuffle"], training["seed"],
+        training["l2"], training["patience"], training["monitor"], training["validation_split"],
     )
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from analyzer.labels import CLASS_SETS, LABELS
 from analyzer.predict import load_chess_network
 from my_torch import load_config, load_network
+from my_torch.config import check_training_settings
 
 ROOT = Path(__file__).resolve().parent.parent
 NETWORK = ROOT / "my_torch_network.nn"
@@ -37,7 +38,7 @@ def test_the_pushed_network_follows_its_configuration():
     config = load_config(CONFIG)
     saved = load_network(NETWORK)
     assert saved.network.architecture == config.layers
-    assert saved.settings == config.training_settings()
+    assert check_training_settings(saved.settings) == config.training_settings()
     assert saved.optimizer.hyperparameters() == config.create_optimizer().hyperparameters()
     assert saved.optimizer.steps == config.epochs * -(-TRAINING_POSITIONS // config.batch_size)
 

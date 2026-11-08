@@ -52,14 +52,40 @@ def read_training_data(path: str, classes: tuple[str, ...]) -> tuple[np.ndarray,
     return inputs, targets
 
 
+def hold_out(
+    inputs: np.ndarray, targets: np.ndarray, share: float, seed: int | None
+) -> tuple[np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    """Keep a random share of the chessboards aside, as a validation set."""
+    count = round(len(inputs) * share)
+    if not 0 < count < len(inputs):
+        raise AnalyzerError(
+            f"validation_split {share} keeps {count} of the {len(inputs)} chessboards aside: "
+            "both the training and the validation sets need at least one"
+        )
+    order = np.random.default_rng(seed).permutation(len(inputs))
+    kept, aside = order[count:], order[:count]
+    return inputs[kept], targets[kept], (inputs[aside], targets[aside])
+
+
 def run_training(arguments: Arguments) -> None:
     """Train the network on the labelled chessboards, then save it once training is over."""
     saved, classes, settings = load_training_network(arguments.load_file)
+    if settings["patience"] is not None and not settings["validation_split"]:
+        raise AnalyzerError(
+            "early stopping needs a validation set: set validation_split in the training "
+            "settings"
+        )
     inputs, targets = read_training_data(arguments.chess_file, classes)
+    validation = None
+    if settings["validation_split"]:
+        inputs, targets, validation = hold_out(
+            inputs, targets, settings["validation_split"], settings["seed"]
+        )
     train(
         saved.network, saved.loss, saved.optimizer, inputs, targets,
         settings["epochs"], settings["batch_size"], settings["shuffle"], settings["seed"],
-        verbose=True,
+        validation=validation, verbose=True, l2=settings["l2"], patience=settings["patience"],
+        monitor=settings["monitor"],
     )
     save_network(
         arguments.save_file or arguments.load_file, saved.network, saved.loss,

@@ -8,6 +8,7 @@ from my_torch.network import Network
 from my_torch.optimizers import Optimizer
 
 EVALUATION_BATCH_SIZE = 1024
+MONITORED = ("val_loss", "val_accuracy")
 
 
 def check_dataset(name: str, inputs: np.ndarray, targets: np.ndarray) -> None:
@@ -27,6 +28,39 @@ def check_dataset(name: str, inputs: np.ndarray, targets: np.ndarray) -> None:
 def check_count(name: str, value: int) -> None:
     if isinstance(value, bool) or not isinstance(value, (int, np.integer)) or value < 1:
         raise MyTorchError(f"{name} must be a positive integer, got {value!r}")
+
+
+def check_l2(value: float) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value < np.inf:
+        raise MyTorchError(f"l2 must be a non-negative number, got {value!r}")
+
+
+def check_early_stopping(
+    patience: int | None, monitor: str, validation: tuple[np.ndarray, np.ndarray] | None
+) -> None:
+    if patience is None:
+        return
+    check_count("patience", patience)
+    if validation is None:
+        raise MyTorchError("early stopping needs a validation set")
+    if monitor not in MONITORED:
+        raise MyTorchError(f"monitor must be one of: {', '.join(MONITORED)}, got {monitor!r}")
+    if monitor == "val_accuracy" and not is_one_hot(validation[1]):
+        raise MyTorchError("val_accuracy needs one-hot validation targets")
+
+
+def snapshot(network: Network, optimizer: Optimizer) -> tuple[list, dict[str, np.ndarray]]:
+    """Copy the parameters of the network and the memory of the optimizer."""
+    parameters = [(layer.weights.copy(), layer.biases.copy()) for layer in network.layers]
+    state = {key: array.copy() for key, array in optimizer.state().items()}
+    return parameters, state
+
+
+def restore(network: Network, optimizer: Optimizer, saved: tuple[list, dict]) -> None:
+    parameters, state = saved
+    for layer, (weights, biases) in zip(network.layers, parameters):
+        layer.weights, layer.biases = weights.copy(), biases.copy()
+    optimizer.load_state(state, network.layers)
 
 
 def is_one_hot(targets: np.ndarray) -> bool:
@@ -75,8 +109,19 @@ def train(
     seed: int | None = None,
     validation: tuple[np.ndarray, np.ndarray] | None = None,
     verbose: bool = False,
+    l2: float = 0.0,
+    patience: int | None = None,
+    monitor: str = "val_loss",
 ) -> dict[str, list[float]]:
     """Train a network on a dataset, with one optimizer step per batch.
+
+    With l2, the loss gets a penalty l2 / 2 times the sum of the squared weights, which
+    pushes the weights towards 0: l2 times the weights is added to their gradient. The
+    biases are not penalised, and the history reports the loss of the data alone.
+
+    With patience, training stops once the monitored validation metric has not improved for
+    that many epochs. The network and the optimizer then go back to the best epoch. The
+    history keeps every epoch that was run.
 
     Return the history of the metrics measured at the end of each epoch.
     """
@@ -87,14 +132,20 @@ def train(
         check_dataset("validation", *validation)
     check_count("epochs", epochs)
     check_count("batch_size", batch_size)
+    check_l2(l2)
+    check_early_stopping(patience, monitor, validation)
     rng = np.random.default_rng(seed)
     history: dict[str, list[float]] = {}
+    best_value, best_epoch, best = None, 0, None
     for epoch in range(1, epochs + 1):
         order = rng.permutation(len(inputs)) if shuffle else np.arange(len(inputs))
         for start in range(0, len(inputs), batch_size):
             batch = order[start:start + batch_size]
             outputs = network.forward(inputs[batch])
             network.backward(loss.backward(outputs, targets[batch]))
+            if l2:
+                for layer in network.layers:
+                    layer.weights_gradient += l2 * layer.weights
             optimizer.step(network.layers)
         metrics = evaluate(network, loss, inputs, targets)
         if validation is not None:
@@ -104,4 +155,18 @@ def train(
             history.setdefault(name, []).append(value)
         if verbose:
             print(format_epoch(epoch, epochs, history), flush=True)
+        if patience is None:
+            continue
+        value = metrics[monitor]
+        if best_value is None or (
+            value < best_value if monitor == "val_loss" else value > best_value
+        ):
+            best_value, best_epoch, best = value, epoch, snapshot(network, optimizer)
+        elif epoch - best_epoch >= patience:
+            break
+    if best is not None:
+        restore(network, optimizer, best)
+        if verbose:
+            print(f"early stopping: best {monitor} {best_value:.4f} at epoch {best_epoch}",
+                  flush=True)
     return history

@@ -333,3 +333,142 @@ def test_lists_are_accepted():
         XOR_INPUTS.tolist(), XOR_TARGETS.tolist(), 2, 2, seed=0,
     )
     assert len(history["loss"]) == 2
+
+
+RANDOM = np.random.default_rng(0)
+NOISY_INPUTS = RANDOM.normal(size=(60, 6))
+NOISY_TARGETS = np.eye(3)[RANDOM.integers(0, 3, 60)]
+UNRELATED_INPUTS = RANDOM.normal(size=(40, 6))
+UNRELATED_TARGETS = np.eye(3)[RANDOM.integers(0, 3, 40)]
+
+
+def penalised_loss(network, loss, inputs, targets, l2):
+    data = loss.forward(network.forward(inputs), targets)
+    return data + l2 / 2 * sum((layer.weights ** 2).sum() for layer in network.layers)
+
+
+def test_l2_gradient_matches_finite_differences_of_the_penalised_loss():
+    loss, l2, learning_rate = get_loss("cross_entropy"), 0.3, 0.1
+    network = Network(6, [(5, "tanh"), (3, "identity")], seed=1)
+    numeric = []
+    for layer in network.layers:
+        gradient = np.zeros_like(layer.weights)
+        for index in np.ndindex(layer.weights.shape):
+            layer.weights[index] += 1e-6
+            up = penalised_loss(network, loss, NOISY_INPUTS, NOISY_TARGETS, l2)
+            layer.weights[index] -= 2e-6
+            down = penalised_loss(network, loss, NOISY_INPUTS, NOISY_TARGETS, l2)
+            layer.weights[index] += 1e-6
+            gradient[index] = (up - down) / 2e-6
+        numeric.append(gradient)
+    before = [layer.weights.copy() for layer in network.layers]
+    train(network, loss, get_optimizer("sgd", learning_rate=learning_rate), NOISY_INPUTS,
+          NOISY_TARGETS, 1, 60, shuffle=False, l2=l2)
+    for old, layer, expected in zip(before, network.layers, numeric):
+        assert (old - layer.weights) / learning_rate == pytest.approx(expected, abs=1e-7)
+
+
+def train_one_step(l2):
+    network = Network(6, [(3, "identity")], seed=2)
+    # Biases start at zero, where a penalty on them would change nothing: start them elsewhere.
+    network.layers[0].biases = np.array([[0.5, -1.0, 2.0]])
+    train(network, get_loss("cross_entropy"), get_optimizer("sgd", learning_rate=0.1),
+          NOISY_INPUTS, NOISY_TARGETS, 1, 60, shuffle=False, l2=l2)
+    return network.layers[0]
+
+
+def test_l2_does_not_touch_the_biases():
+    plain, penalised = train_one_step(0.0), train_one_step(1.0)
+    assert np.array_equal(plain.biases, penalised.biases)
+    assert not np.array_equal(plain.weights, penalised.weights)
+
+
+def test_l2_shrinks_the_weights():
+    norms = []
+    for l2 in (0.0, 0.05):
+        network = Network(6, [(16, "relu"), (3, "identity")], seed=3)
+        train(network, get_loss("cross_entropy"), get_optimizer("adam", learning_rate=0.01),
+              NOISY_INPUTS, NOISY_TARGETS, 100, 10, seed=0, l2=l2)
+        norms.append(sum((layer.weights ** 2).sum() for layer in network.layers))
+    assert norms[1] < norms[0] / 5
+
+
+@pytest.mark.parametrize("value", [-0.1, float("nan"), float("inf"), "0.1", True])
+def test_invalid_l2_raises_an_error(value):
+    with pytest.raises(MyTorchError, match="l2"):
+        train(Network(6, [(3, "identity")]), get_loss("mse"), get_optimizer("sgd"),
+              NOISY_INPUTS, NOISY_TARGETS, 1, 10, l2=value)
+
+
+def train_with_early_stopping(monitor, patience=5, epochs=200, verbose=False):
+    network = Network(6, [(32, "relu"), (3, "identity")], seed=0)
+    optimizer = get_optimizer("adam", learning_rate=0.01)
+    history = train(network, get_loss("cross_entropy"), optimizer, NOISY_INPUTS, NOISY_TARGETS,
+                    epochs, 10, seed=0, validation=(UNRELATED_INPUTS, UNRELATED_TARGETS),
+                    patience=patience, monitor=monitor, verbose=verbose)
+    return network, optimizer, history
+
+
+@pytest.mark.parametrize("monitor, pick", [("val_loss", np.argmin), ("val_accuracy", np.argmax)])
+def test_training_stops_patience_epochs_after_the_best_one(monitor, pick):
+    network, _, history = train_with_early_stopping(monitor)
+    best = int(pick(history[monitor])) + 1
+    assert len(history[monitor]) == best + 5 < 200
+    restored = evaluate(network, get_loss("cross_entropy"), UNRELATED_INPUTS, UNRELATED_TARGETS)
+    assert restored[monitor[4:]] == pytest.approx(history[monitor][best - 1])
+
+
+def test_the_best_network_and_optimizer_are_restored():
+    network, optimizer, history = train_with_early_stopping("val_loss", patience=3, epochs=50)
+    best = int(np.argmin(history["val_loss"])) + 1
+    reference = Network(6, [(32, "relu"), (3, "identity")], seed=0)
+    reference_optimizer = get_optimizer("adam", learning_rate=0.01)
+    train(reference, get_loss("cross_entropy"), reference_optimizer, NOISY_INPUTS,
+          NOISY_TARGETS, best, 10, seed=0)
+    for layer, expected in zip(network.layers, reference.layers):
+        assert np.array_equal(layer.weights, expected.weights)
+        assert np.array_equal(layer.biases, expected.biases)
+    assert optimizer.steps == reference_optimizer.steps
+    for key, array in reference_optimizer.state().items():
+        assert np.array_equal(optimizer.state()[key], array)
+
+
+def test_the_best_epoch_is_restored_even_without_stopping():
+    network, _, history = train_with_early_stopping("val_loss", patience=100, epochs=12)
+    assert len(history["val_loss"]) == 12
+    best = min(history["val_loss"])
+    restored = evaluate(network, get_loss("cross_entropy"), UNRELATED_INPUTS, UNRELATED_TARGETS)
+    assert restored["loss"] == pytest.approx(best)
+
+
+def test_early_stopping_is_reported(capsys):
+    _, _, history = train_with_early_stopping("val_accuracy", verbose=True)
+    best = int(np.argmax(history["val_accuracy"])) + 1
+    last = capsys.readouterr().out.splitlines()[-1]
+    assert last == (f"early stopping: best val_accuracy {history['val_accuracy'][best - 1]:.4f} "
+                    f"at epoch {best}")
+
+
+def test_without_patience_the_monitor_changes_nothing():
+    histories = []
+    for monitor in ("val_loss", "val_accuracy"):
+        network = Network(6, [(8, "relu"), (3, "identity")], seed=4)
+        histories.append(train(network, get_loss("cross_entropy"), get_optimizer("sgd"),
+                               NOISY_INPUTS, NOISY_TARGETS, 5, 10, seed=1,
+                               validation=(UNRELATED_INPUTS, UNRELATED_TARGETS), monitor=monitor))
+    assert histories[0] == histories[1]
+
+
+@pytest.mark.parametrize("options, message", [
+    ({"patience": 3}, "needs a validation set"),
+    ({"patience": 0, "validation": (UNRELATED_INPUTS, UNRELATED_TARGETS)}, "patience"),
+    ({"patience": True, "validation": (UNRELATED_INPUTS, UNRELATED_TARGETS)}, "patience"),
+    ({"patience": 2, "validation": (UNRELATED_INPUTS, UNRELATED_TARGETS), "monitor": "loss"},
+     "monitor must be one of"),
+    ({"patience": 2, "validation": (UNRELATED_INPUTS, UNRELATED_INPUTS[:, :3]),
+      "monitor": "val_accuracy"}, "one-hot"),
+])
+def test_invalid_early_stopping_raises_an_error(options, message):
+    with pytest.raises(MyTorchError, match=message):
+        train(Network(6, [(3, "identity")]), get_loss("cross_entropy"), get_optimizer("sgd"),
+              NOISY_INPUTS, NOISY_TARGETS, 2, 10, **options)

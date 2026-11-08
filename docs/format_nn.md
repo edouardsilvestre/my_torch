@@ -39,11 +39,12 @@ Voici la description d'un réseau `768 → 256 → 64 → 3` entraîné avec Ada
         "name": "adam",
         "hyperparameters": {"learning_rate": 0.001, "beta1": 0.9, "beta2": 0.999, "epsilon": 1e-08}
     },
-    "settings": {"epochs": 20, "batch_size": 64, "shuffle": true, "seed": null}
+    "settings": {"epochs": 20, "batch_size": 64, "shuffle": true, "seed": null, "l2": 0.0,
+                 "patience": null, "monitor": "val_loss", "validation_split": 0.0}
 }
 ```
 
-Les réglages de `settings` sont ceux de la section `[training]` du [fichier de configuration](configuration.md), sans le coût, qui est enregistré à part.
+Les réglages de `settings` sont ceux de la section `[training]` du [fichier de configuration](configuration.md), sans le coût, qui est enregistré à part. Un fichier plus ancien, qui n'a que les quatre premiers réglages, se charge toujours : les réglages absents prennent leur valeur par défaut, qui ne change rien à l'entraînement.
 
 ## Ce qui est nécessaire, et ce qui ne l'est pas
 
