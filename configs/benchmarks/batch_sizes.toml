@@ -1,0 +1,8 @@
+# Benchmark de la taille des batchs : précision et temps par epoch (docs/benchmarks.md).
+title = "Taille des batchs"
+
+[variants]
+"32" = { batch_size = 32 }
+"64" = { batch_size = 64 }
+"128" = { batch_size = 128 }
+"256" = { batch_size = 256 }
