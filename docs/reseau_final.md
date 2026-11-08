@@ -86,6 +86,8 @@ Comme toutes les graines sont fixées, il est identique au réseau gardé par l'
 
 [Le dropout](dropout.md) a aussi été mesuré : il réduit l'écart entre l'entraînement et la validation, mais fait baisser la validation. Il n'est pas utilisé.
 
+[La recherche d'hyperparamètres](recherche.md) n'a pas trouvé mieux : ses meilleurs jeux, des réseaux `[128]` qui gagnaient sur 60 000 positions, ne font que 81,5 % de validation sur tout le dataset, contre 89,07 % pour cette architecture au même learning rate fixe.
+
 ## Ce qu'il vaut
 
 Sur le **jeu de test du dataset fourni**, 71 554 positions que le réseau n'a jamais vues, avec la répartition du dataset (41,6 % de `Nothing`, 34,7 % d'échecs, 23,7 % de mats) :
