@@ -79,6 +79,29 @@ class IntRange:
 Dimension = Choice | LogUniform | IntRange
 
 
+DIMENSIONS = {"choice": Choice, "log_uniform": LogUniform, "int_range": IntRange}
+
+
+def read_space(table: Any) -> dict[str, Dimension]:
+    """Read a search space written as data, for example in TOML:
+    { learning_rate = { log_uniform = [0.0001, 0.01] }, batch_size = { choice = [32, 64] } }"""
+    if not isinstance(table, dict) or not table:
+        raise MyTorchError("a search space needs at least one hyperparameter")
+    space = {}
+    for name, description in table.items():
+        if not isinstance(description, dict) or len(description) != 1 or (
+                next(iter(description)) not in DIMENSIONS):
+            raise MyTorchError(f"hyperparameter '{name}' needs one of: {', '.join(DIMENSIONS)}")
+        kind, values = next(iter(description.items()))
+        if kind == "choice":
+            space[name] = Choice(values)
+        elif not isinstance(values, list) or len(values) != 2:
+            raise MyTorchError(f"hyperparameter '{name}': {kind} needs [low, high]")
+        else:
+            space[name] = DIMENSIONS[kind](*values)
+    return space
+
+
 def check_space(space: dict[str, Dimension]) -> None:
     if not isinstance(space, dict) or not space:
         raise MyTorchError("a search space needs at least one hyperparameter")
@@ -155,16 +178,21 @@ class Search:
         """The trials from the best score to the worst; the first trial wins a tie."""
         return sorted(self.trials, key=lambda trial: (-trial.score, trial.number))
 
+    def restore(self, trials: list[Trial]) -> None:
+        """Take back the trials of an earlier run of the same search, which are then not
+        evaluated again: an interrupted search goes on where it stopped."""
+        for trial in trials:
+            self.scores[json.dumps(trial.params, sort_keys=True)] = trial.score
+            self.trials.append(trial)
+
     def random(self, trials: int, seed: int | None = None) -> list[Trial]:
-        """Evaluate random sets until trials new ones have been evaluated, or no new set
-        is found in many draws (a small space can be exhausted)."""
+        """Draw trials sets at random and evaluate them. A set drawn twice is evaluated
+        once: the search can give fewer trials than draws."""
         check_positive("trials", trials)
         rng = np.random.default_rng(seed)
-        start, misses = len(self.trials), 0
-        while len(self.trials) - start < trials and misses < 100 * trials:
-            before = len(self.trials)
+        start = len(self.trials)
+        for _ in range(trials):
             self.score(sample(self.space, rng), "random")
-            misses += len(self.trials) == before
         return self.trials[start:]
 
     def genetic(self, population: int, generations: int, seed: int | None = None,
