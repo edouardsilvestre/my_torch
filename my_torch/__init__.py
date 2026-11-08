@@ -9,6 +9,7 @@ from my_torch.losses import Loss, get_loss
 from my_torch.mc_dropout import mc_dropout
 from my_torch.network import Network
 from my_torch.optimizers import Optimizer, get_optimizer
+from my_torch.schedules import Schedule, get_schedule
 from my_torch.serialization import SavedNetwork, load_network, save_network
 from my_torch.training import train
 
@@ -21,10 +22,12 @@ __all__ = [
     "Network",
     "Optimizer",
     "SavedNetwork",
+    "Schedule",
     "get_activation",
     "get_initializer",
     "get_loss",
     "get_optimizer",
+    "get_schedule",
     "load_config",
     "load_network",
     "mc_dropout",

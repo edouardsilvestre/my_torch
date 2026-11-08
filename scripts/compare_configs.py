@@ -49,7 +49,7 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
         network, loss, optimizer, inputs, targets,
         config.epochs, config.batch_size, config.shuffle, config.training_seed,
         validation=(validation_inputs, validation_targets), verbose=True, l2=config.l2,
-        patience=config.patience, monitor=config.monitor,
+        patience=config.patience, monitor=config.monitor, schedule=config.create_schedule(),
     )
     seconds = time.perf_counter() - start
     if save_dir is not None:
@@ -67,6 +67,7 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
         "validation_macro_f1": levels[0].metrics.macro.f1,
         "best_epoch": best_epoch,
         "best_validation_accuracy": history["val_accuracy"][best_epoch - 1],
+        "learning_rate": optimizer.learning_rate,
         "history": history,
     }
 

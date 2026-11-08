@@ -13,10 +13,10 @@ $> ./scripts/build_network.sh
 1. **Préparer le dataset fourni avec le sujet,** `dataset.zip`, qui doit se trouver à la racine du dépôt. Les 723 019 positions sont rassemblées dans `datasets/official.txt`, comme l'explique [le document sur les données](dataset.md).
 2. **Le découper,** avec la graine 0, en 572 449 positions d'entraînement, 71 556 de validation et 71 554 de test. Les 7 460 positions en double sont retirées avant le découpage.
 3. **Créer un réseau vierge** depuis [configs/my_torch_network.conf](../configs/my_torch_network.conf), avec `my_torch_generator`.
-4. **L'entraîner** sur le jeu d'entraînement avec `my_torch_analyzer --train`, en 24 epochs, avec une régularisation L2 de 1e-4.
+4. **L'entraîner** sur le jeu d'entraînement avec `my_torch_analyzer --train`, en 19 epochs, avec une régularisation L2 de 1e-4 et un learning rate divisé par 2 avant les epochs 17 et 19.
 5. **L'évaluer** sur la validation, puis sur le test.
 
-L'ensemble prend environ 2 heures sur notre machine. Toutes les graines sont fixées, donc relancer le script redonne le même réseau. Le sujet exige de garder tous les scripts d'entraînement. `dataset.zip` n'est pas poussé : tout le monde le reçoit avec le sujet, et le sujet n'impose pas de pousser les datasets.
+L'ensemble prend environ 1 h 30 sur notre machine. Toutes les graines sont fixées, donc relancer le script redonne le même réseau. Le sujet exige de garder tous les scripts d'entraînement. `dataset.zip` n'est pas poussé : tout le monde le reçoit avec le sujet, et le sujet n'impose pas de pousser les datasets.
 
 ## Pourquoi le dataset fourni
 
@@ -60,37 +60,59 @@ Entraînée 10 epochs sans régularisation, cette configuration faisait 95,8 % s
 | **0,0001** | **24** | 92,7 % | **89,1 %** | **3,6 points** |
 | 0,001 | 21 | 82,2 % | 80,6 % | 1,6 point |
 
-**Le réseau poussé utilise `l2 = 1e-4`, entraîné 24 epochs.** La pénalité empêche le réseau de retenir les positions d'entraînement, et il continue de progresser en validation bien plus longtemps. Avec `1e-3`, la pénalité est trop forte : le réseau n'apprend même plus bien l'entraînement.
+**La configuration retenue utilise `l2 = 1e-4`.** La pénalité empêche le réseau de retenir les positions d'entraînement, et il continue de progresser en validation bien plus longtemps. Avec `1e-3`, la pénalité est trop forte : le réseau n'apprend même plus bien l'entraînement.
 
-`--train` ne voit que le jeu d'entraînement : le réseau est donc réentraîné jusqu'à l'epoch 24, sans patience. Comme toutes les graines sont fixées, il est identique au réseau gardé par l'early stopping : sa validation est exactement la même, 89,07 %.
+## Un learning rate qui baisse au bon moment
+
+Avec un learning rate fixe de 0,001, la validation plafonnait vers 89 %. [La planification du learning rate](learning_rate.md) a ensuite été mesurée sur ce réseau, toujours sur la validation :
+
+| Learning rate | Epoch gardée | Entraînement | Validation 5 classes |
+|---|---|---|---|
+| Fixe, 0,001 | 24 | 92,7 % | 89,07 % |
+| `cosine`, de 0,001 à 0,00001 | 20 | 97,4 % | 88,88 % |
+| **`plateau` : divisé par 2 quand la validation ne progresse plus** | **19** | 96,6 % | **90,06 %** |
+
+Le planning plateau a divisé le learning rate avant les epochs 17 et 19, et la validation a aussitôt gagné un point : avec des pas plus petits, les poids cessent d'osciller autour d'un minimum.
+
+**Le réseau poussé suit ces mêmes learning rates.** `--train` ne voit que le jeu d'entraînement, sans validation pour guider un plateau ni l'early stopping. Le réseau est donc réentraîné 19 epochs avec le planning `multistep`, qui divise le learning rate avant les epochs 17 et 19 :
+
+```toml
+epochs = 19
+l2 = 0.0001
+schedule = { name = "multistep", factor = 0.5, milestones = [17, 19] }
+```
+
+Comme toutes les graines sont fixées, il est identique au réseau gardé par l'early stopping du plateau : sa validation est exactement la même, 90,06 %.
+
+[Le dropout](dropout.md) a aussi été mesuré : il réduit l'écart entre l'entraînement et la validation, mais fait baisser la validation. Il n'est pas utilisé.
 
 ## Ce qu'il vaut
 
 Sur le **jeu de test du dataset fourni**, 71 554 positions que le réseau n'a jamais vues, avec la répartition du dataset (41,6 % de `Nothing`, 34,7 % d'échecs, 23,7 % de mats) :
 
-| Niveau du correcteur | Première version | Dataset fourni, sans L2 | Ce réseau |
-|---|---|---|---|
-| `Check` / `Nothing` | 71,6 % | 92,6 % | **95,0 %** |
-| `Checkmate` / `Check` / `Nothing` | 53,6 % | 84,9 % | **88,9 %** |
-| Avec les couleurs | 53,6 % | 84,9 % | **88,9 %** |
+| Niveau du correcteur | Première version | Dataset fourni, sans L2 | Avec L2 | Ce réseau, L2 et learning rate planifié |
+|---|---|---|---|---|
+| `Check` / `Nothing` | 71,6 % | 92,6 % | 95,0 % | **95,7 %** |
+| `Checkmate` / `Check` / `Nothing` | 53,6 % | 84,9 % | 88,9 % | **90,0 %** |
+| Avec les couleurs | 53,6 % | 84,9 % | 88,9 % | **90,0 %** |
 
 **Par classe :**
 
 | Classe | Précision | Rappel | F1 |
 |---|---|---|---|
-| `Nothing` | 0,95 | 0,93 | 0,94 |
-| `Check White` | 0,87 | 0,84 | 0,86 |
-| `Check Black` | 0,85 | 0,83 | 0,84 |
-| `Checkmate White` | 0,83 | 0,89 | 0,86 |
-| `Checkmate Black` | 0,83 | 0,89 | 0,86 |
+| `Nothing` | 0,96 | 0,94 | 0,95 |
+| `Check White` | 0,88 | 0,87 | 0,87 |
+| `Check Black` | 0,86 | 0,84 | 0,85 |
+| `Checkmate White` | 0,86 | 0,89 | 0,88 |
+| `Checkmate Black` | 0,84 | 0,89 | 0,87 |
 
-- **Toutes les classes progressent** par rapport au réseau sans L2, de 3 à 6 points de F1.
-- **Les couleurs ne sont jamais confondues :** aucune erreur de couleur sur 41 798 échecs et mats.
-- **La difficulté principale reste de séparer un échec d'un mat :** 2 703 échecs sont pris pour des mats, et 1 663 mats pour des échecs, contre 2 859 et 2 645 sans L2.
+- **Toutes les classes progressent** par rapport au réseau avec L2 seule, de 0,8 à 1,5 point de F1.
+- **Les couleurs ne sont presque jamais confondues :** une seule erreur de couleur sur 41 798 échecs et mats.
+- **La difficulté principale reste de séparer un échec d'un mat :** 2 413 échecs sont pris pour des mats, et 1 681 mats pour des échecs, contre 2 703 et 1 663 avec L2 seule.
 
-Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 80,7 % avec les couleurs, contre 74,1 % sans L2 et 71,8 % pour la première version.
+Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 81,8 % avec les couleurs, contre 80,7 % avec L2 seule, 74,1 % sans L2 et 71,8 % pour la première version.
 
-**Sur les 5 positions de l'exemple du sujet,** il en trouve 4. Il prend toujours le mat du fou pour `Check Black`, mais il ne voit plus d'échec dans la position avec seulement les deux rois. La première version les trouvait toutes les 5. Ces 5 positions pèsent peu face aux 71 554 du jeu de test, mais elles montrent que des erreurs restent possibles sur des positions simples.
+**Sur les 5 positions de l'exemple du sujet,** il les trouve toutes les 5, comme la première version. Le réseau sans L2 n'en trouvait que 3, et celui avec L2 seule 4. Ces 5 positions pèsent peu face aux 71 554 du jeu de test, mais elles montrent que des erreurs restent possibles sur des positions simples.
 
 ## Le fichier poussé
 
@@ -105,6 +127,6 @@ Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 80,7
 
 ## Les limites et la suite
 
-- **Un écart de 3,6 points** entre l'entraînement et la validation, contre 10,5 sans régularisation. [Le dropout](dropout.md) le réduit encore, mais fait aussi baisser la validation : il n'est pas utilisé.
+- **Un écart de 6,6 points** entre l'entraînement et la validation, contre 3,6 avec L2 seule et 10,5 sans régularisation. Les pas plus petits de la fin font mieux apprendre l'entraînement, et la validation progresse moins vite que lui. [Le dropout](dropout.md) réduit l'écart, mais fait aussi baisser la validation : il n'est pas utilisé.
 - **Des positions inconnues.** Les fichiers du correcteur ne sont pas exactement le dataset fourni : sa précision peut différer de celle mesurée ici.
 - **Le format aux niveaux simples.** Le réseau répond toujours avec les couleurs. Le premier essai suggère que le correcteur les accepte, mais ce n'est pas certain.

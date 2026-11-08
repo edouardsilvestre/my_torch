@@ -41,6 +41,25 @@ def kept_epoch(result: dict) -> int:
     return result.get("kept_epoch", len(result["history"]["val_loss"]))
 
 
+def learning_rates(result: dict) -> list[float] | None:
+    """The learning rate of each epoch: planned by a schedule, or fixed. None when the
+    results do not tell it."""
+    history = result["history"]
+    if history.get("learning_rate"):
+        return history["learning_rate"]
+    if "learning_rate" in result:
+        return [result["learning_rate"]] * len(history["loss"])
+    return None
+
+
+def draw_learning_rates(axis, results: list[dict]) -> None:
+    for color, result in zip(COLORS, results):
+        rates = learning_rates(result)
+        if rates is not None:
+            axis.plot(range(1, len(rates) + 1), rates, color=color, linewidth=2)
+    axis.set_yscale("log")
+
+
 def label_line_ends(axis, results: list[dict], key: str, color: str, gap: float = 13) -> None:
     """Write each configuration's name at the end of its curve, moved apart vertically when
     two names would overlap (gap in points)."""
@@ -64,10 +83,13 @@ def plot(results: list[dict], output: Path, title: str | None) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    figure, axes = plt.subplots(1, len(PANELS), figsize=(12, 4.8), facecolor=SURFACE)
-    for axis, (key, name) in zip(axes, PANELS):
+    panels = PANELS + ([("learning_rate", "Learning rate")]
+                       if any(learning_rates(result) for result in results) else [])
+    figure, axes = plt.subplots(1, len(panels), figsize=(6 * len(panels), 4.8),
+                                facecolor=SURFACE)
+    for axis, (key, name) in zip(axes, panels):
         axis.set_facecolor(SURFACE)
-        for color, result in zip(COLORS, results):
+        for color, result in zip(COLORS, results if key != "learning_rate" else []):
             label = Path(result["config"]).stem
             history = result["history"]
             epochs = range(1, len(history[key]) + 1)
@@ -76,6 +98,8 @@ def plot(results: list[dict], output: Path, title: str | None) -> None:
             kept = kept_epoch(result)
             axis.plot(kept, history[f"val_{key}"][kept - 1], "o", color=color, markersize=8,
                       markeredgecolor=SURFACE, markeredgewidth=2, zorder=3)
+        if key == "learning_rate":
+            draw_learning_rates(axis, results)
         axis.set_title(name, loc="left", color=INK, fontsize=12)
         axis.set_xlabel("Epoch", color=MUTED)
         axis.grid(True, color=GRID, linewidth=0.8)
@@ -84,7 +108,7 @@ def plot(results: list[dict], output: Path, title: str | None) -> None:
             axis.spines[side].set_visible(False)
         for side in ("left", "bottom"):
             axis.spines[side].set_color(GRID)
-        longest = max(len(result["history"][key]) for result in results)
+        longest = max(len(result["history"]["loss"]) for result in results)
         axis.set_xlim(1, longest + max(2, longest * 0.25))
     legend = [
         plt.Line2D([], [], color=MUTED, linewidth=2, label="validation"),
@@ -98,7 +122,7 @@ def plot(results: list[dict], output: Path, title: str | None) -> None:
         figure.suptitle(title, x=0.01, ha="left", color=INK, fontsize=14)
     figure.tight_layout()
     # Placed once the layout is final, since moving the names apart works in points.
-    label_line_ends(axes[-1], results, f"val_{PANELS[-1][0]}", INK)
+    label_line_ends(axes[len(PANELS) - 1], results, f"val_{PANELS[-1][0]}", INK)
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output, dpi=120, facecolor=SURFACE)
     plt.close(figure)

@@ -12,6 +12,7 @@ from analyzer.labels import encode_labels, to_class
 from analyzer.predict import check_chess_network
 from my_torch import MyTorchError, SavedNetwork, load_network, save_network, train
 from my_torch.config import check_training_settings
+from my_torch.schedules import schedule_from_settings
 
 
 def load_training_network(path: str) -> tuple[SavedNetwork, tuple[str, ...], dict[str, Any]]:
@@ -75,6 +76,14 @@ def run_training(arguments: Arguments) -> None:
             "early stopping needs a validation set: set validation_split in the training "
             "settings"
         )
+    schedule = schedule_from_settings(settings["schedule"])
+    if schedule is not None and not settings["validation_split"]:
+        try:
+            schedule.check_metrics({"loss", "accuracy"})
+        except MyTorchError as error:
+            raise AnalyzerError(
+                f"{error}: set validation_split in the training settings"
+            ) from error
     inputs, targets = read_training_data(arguments.chess_file, classes)
     validation = None
     if settings["validation_split"]:
@@ -85,7 +94,7 @@ def run_training(arguments: Arguments) -> None:
         saved.network, saved.loss, saved.optimizer, inputs, targets,
         settings["epochs"], settings["batch_size"], settings["shuffle"], settings["seed"],
         validation=validation, verbose=True, l2=settings["l2"], patience=settings["patience"],
-        monitor=settings["monitor"],
+        monitor=settings["monitor"], schedule=schedule,
     )
     save_network(
         arguments.save_file or arguments.load_file, saved.network, saved.loss,

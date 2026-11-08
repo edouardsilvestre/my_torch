@@ -98,7 +98,7 @@ En pointillés l'entraînement, en trait plein la validation, et un point sur l'
 - **Avec `l2 = 1e-3`, la pénalité est trop forte.** Le réseau n'arrive même plus à bien apprendre l'entraînement, 82,2 %, et la validation est plus basse que sans L2 : c'est de l'**underfitting**.
 - **Surveiller `val_accuracy` plutôt que `val_loss` était le bon choix ici.** Sans L2, le coût de validation remonte dès l'epoch 5, alors que l'accuracy progresse encore jusqu'à l'epoch 10. Le coût punit très fort les quelques erreurs commises avec assurance, et peut donc remonter alors que le nombre de bonnes réponses augmente encore. C'est ce nombre de bonnes réponses que mesure le correcteur.
 
-**Le choix : `l2 = 1e-4`, entraîné 24 epochs.** C'est la meilleure configuration sur toutes les mesures de validation. Le réseau poussé est réentraîné avec ces réglages, sans patience : `--train` ne voit que le jeu d'entraînement, et 24 epochs redonnent exactement le réseau gardé par l'early stopping. Ses résultats sur le test sont dans [le document du réseau final](reseau_final.md).
+**Le choix : `l2 = 1e-4`, entraîné 24 epochs.** C'est la meilleure configuration sur toutes les mesures de validation. Le réseau poussé est réentraîné avec ces réglages, sans patience : `--train` ne voit que le jeu d'entraînement, et 24 epochs redonnent exactement le réseau gardé par l'early stopping. [La planification du learning rate](learning_rate.md) a ensuite amélioré ce réseau ; les résultats du réseau poussé sur le test sont dans [le document du réseau final](reseau_final.md).
 
 La comparaison se refait avec :
 

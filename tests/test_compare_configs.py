@@ -120,6 +120,18 @@ def test_the_kept_networks_can_be_saved(files):
     assert results[0]["kept_epoch"] < 100
 
 
+def test_the_schedule_of_a_configuration_is_used(files):
+    scheduled = CONFIG.format(hidden=8, outputs=5).replace(
+        "seed = 0\n\n[optimizer]",
+        'seed = 0\nschedule = { name = "step", factor = 0.5, every = 50 }\n\n[optimizer]')
+    (files / "scheduled.conf").write_text(scheduled)
+    run(files, "scheduled.conf", json_name="results.json")
+    history = json.loads((files / "results.json").read_text())[0]["history"]
+    assert history["learning_rate"] == [0.01] * 50 + [0.005] * 50
+    # The result keeps the learning rate of the configuration, the one the schedule starts from.
+    assert json.loads((files / "results.json").read_text())[0]["learning_rate"] == 0.01
+
+
 def test_train_accuracy_is_the_one_of_the_kept_epoch(files, monkeypatch):
     history = {"loss": [0.9, 0.4, 0.3], "accuracy": [0.2, 0.7, 0.9],
                "val_loss": [0.8, 0.5, 0.6], "val_accuracy": [0.3, 0.6, 0.6]}

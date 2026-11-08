@@ -6,6 +6,7 @@ from my_torch.errors import MyTorchError
 from my_torch.losses import Loss
 from my_torch.network import Network
 from my_torch.optimizers import Optimizer
+from my_torch.schedules import Schedule
 
 EVALUATION_BATCH_SIZE = 1024
 MONITORED = ("val_loss", "val_accuracy")
@@ -93,7 +94,10 @@ def evaluate(
 
 def format_epoch(epoch: int, epochs: int, history: dict[str, list[float]]) -> str:
     """Describe the metrics of the last epoch on a single line."""
-    metrics = " - ".join(f"{name} {values[-1]:.4f}" for name, values in history.items())
+    metrics = " - ".join(
+        f"{name} {values[-1]:.4g}" if name == "learning_rate" else f"{name} {values[-1]:.4f}"
+        for name, values in history.items()
+    )
     return f"epoch {epoch:>{len(str(epochs))}}/{epochs} - {metrics}"
 
 
@@ -112,6 +116,7 @@ def train(
     l2: float = 0.0,
     patience: int | None = None,
     monitor: str = "val_loss",
+    schedule: Schedule | None = None,
 ) -> dict[str, list[float]]:
     """Train a network on a dataset, with one optimizer step per batch.
 
@@ -126,6 +131,10 @@ def train(
     Dropout, when the network has some, is only active on the batches of training: the
     metrics are measured with every neuron.
 
+    With a schedule, the learning rate of each epoch is computed from the learning rate of
+    the optimizer, and the history also holds it. The optimizer gets its own learning rate
+    back at the end.
+
     Return the history of the metrics measured at the end of each epoch.
     """
     inputs, targets = np.asarray(inputs), np.asarray(targets)
@@ -137,6 +146,8 @@ def train(
     check_count("batch_size", batch_size)
     check_l2(l2)
     check_early_stopping(patience, monitor, validation)
+    if schedule is not None:
+        schedule.check_metrics(expected_metrics(targets, validation))
     rng = np.random.default_rng(seed)
     # The masks of dropout get their own generator, so that the order of the examples
     # stays the same with or without dropout.
@@ -145,37 +156,55 @@ def train(
         if any(network.dropout) else None
     )
     history: dict[str, list[float]] = {}
-    best_value, best_epoch, best = None, 0, None
-    for epoch in range(1, epochs + 1):
-        order = rng.permutation(len(inputs)) if shuffle else np.arange(len(inputs))
-        for start in range(0, len(inputs), batch_size):
-            batch = order[start:start + batch_size]
-            outputs = network.forward(inputs[batch], dropout_rng)
-            network.backward(loss.backward(outputs, targets[batch]))
-            if l2:
-                for layer in network.layers:
-                    layer.weights_gradient += l2 * layer.weights
-            optimizer.step(network.layers)
-        metrics = evaluate(network, loss, inputs, targets)
-        if validation is not None:
-            for name, value in evaluate(network, loss, *validation).items():
-                metrics[f"val_{name}"] = value
-        for name, value in metrics.items():
-            history.setdefault(name, []).append(value)
-        if verbose:
-            print(format_epoch(epoch, epochs, history), flush=True)
-        if patience is None:
-            continue
-        value = metrics[monitor]
-        if best_value is None or (
-            value < best_value if monitor == "val_loss" else value > best_value
-        ):
-            best_value, best_epoch, best = value, epoch, snapshot(network, optimizer)
-        elif epoch - best_epoch >= patience:
-            break
+    base_rate = optimizer.learning_rate
+    try:
+        best_value, best_epoch, best = None, 0, None
+        for epoch in range(1, epochs + 1):
+            if schedule is not None:
+                optimizer.learning_rate = schedule.learning_rate(base_rate, epoch, epochs, history)
+            order = rng.permutation(len(inputs)) if shuffle else np.arange(len(inputs))
+            for start in range(0, len(inputs), batch_size):
+                batch = order[start:start + batch_size]
+                outputs = network.forward(inputs[batch], dropout_rng)
+                network.backward(loss.backward(outputs, targets[batch]))
+                if l2:
+                    for layer in network.layers:
+                        layer.weights_gradient += l2 * layer.weights
+                optimizer.step(network.layers)
+            metrics = evaluate(network, loss, inputs, targets)
+            if validation is not None:
+                for name, value in evaluate(network, loss, *validation).items():
+                    metrics[f"val_{name}"] = value
+            if schedule is not None:
+                metrics["learning_rate"] = optimizer.learning_rate
+            for name, value in metrics.items():
+                history.setdefault(name, []).append(value)
+            if verbose:
+                print(format_epoch(epoch, epochs, history), flush=True)
+            if patience is None:
+                continue
+            value = metrics[monitor]
+            if best_value is None or (
+                value < best_value if monitor == "val_loss" else value > best_value
+            ):
+                best_value, best_epoch, best = value, epoch, snapshot(network, optimizer)
+            elif epoch - best_epoch >= patience:
+                break
+    finally:
+        optimizer.learning_rate = base_rate
     if best is not None:
         restore(network, optimizer, best)
         if verbose:
             print(f"early stopping: best {monitor} {best_value:.4f} at epoch {best_epoch}",
                   flush=True)
     return history
+
+
+def expected_metrics(
+    targets: np.ndarray, validation: tuple[np.ndarray, np.ndarray] | None
+) -> set[str]:
+    """The metrics that the history will hold."""
+    metrics = {"loss", "accuracy"} if is_one_hot(targets) else {"loss"}
+    if validation is not None:
+        metrics |= {"val_loss", "val_accuracy"} if is_one_hot(validation[1]) else {"val_loss"}
+    return metrics
