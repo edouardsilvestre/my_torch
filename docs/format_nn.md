@@ -41,11 +41,14 @@ Voici la description d'un réseau `768 → 256 → 64 → 3` entraîné avec Ada
         "hyperparameters": {"learning_rate": 0.001, "beta1": 0.9, "beta2": 0.999, "epsilon": 1e-08}
     },
     "settings": {"epochs": 20, "batch_size": 64, "shuffle": true, "seed": null, "l2": 0.0,
-                 "patience": null, "monitor": "val_loss", "validation_split": 0.0}
+                 "patience": null, "monitor": "val_loss", "validation_split": 0.0,
+                 "schedule": null}
 }
 ```
 
 Les réglages de `settings` sont ceux de la section `[training]` du [fichier de configuration](configuration.md), sans le coût, qui est enregistré à part. Un fichier plus ancien, qui n'a que les quatre premiers réglages, se charge toujours : les réglages absents prennent leur valeur par défaut, qui ne change rien à l'entraînement.
+
+`schedule` décrit la [planification du learning rate](learning_rate.md), avec tous ses paramètres, ou vaut `null` pour un learning rate fixe.
 
 `dropout` donne le taux de [dropout](dropout.md) de chaque couche. Un fichier écrit avant l'ajout du dropout n'a pas ce champ : il se charge sans dropout.
 

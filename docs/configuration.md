@@ -71,6 +71,7 @@ Le `dropout` d'une couche est la part de ses neurones éteints au hasard à chaq
 | `patience` | Non | Entier strictement positif : epochs sans progrès avant [l'early stopping](regularisation.md) | Aucune |
 | `monitor` | Non | `val_loss` ou `val_accuracy` : la mesure de validation que surveille l'early stopping | `val_loss` |
 | `validation_split` | Non | Part des positions que `--train` met de côté pour la validation, de 0 inclus à 1 exclu | `0` |
+| `schedule` | Non | Table `{ name = "<planning>", ... }` : la [planification du learning rate](learning_rate.md), `step`, `multistep`, `exponential`, `cosine` ou `plateau` avec leurs paramètres | Aucune, learning rate fixe |
 
 Le nombre d'epochs et la taille de batch n'ont pas de valeur par défaut : une valeur choisie d'avance serait arbitraire, et elle dépend trop du problème.
 
@@ -122,7 +123,7 @@ save_network(
 
 - **`create_network(seed=None)`** crée un réseau vierge. Sans argument, il utilise la graine de la configuration. Une autre graine permet de créer plusieurs réseaux différents à partir de la même configuration.
 - **`create_optimizer()`** crée un nouvel optimiseur à chaque appel, car un optimiseur garde une mémoire propre à un réseau.
-- **`training_settings()`** donne les huit réglages de `[training]` autres que le coût, avec leur valeur par défaut s'ils sont absents. Ce sont les réglages enregistrés dans le [fichier .nn](format_nn.md), avec le coût et l'optimiseur.
+- **`training_settings()`** donne les neuf réglages de `[training]` autres que le coût, avec leur valeur par défaut s'ils sont absents. Ce sont les réglages enregistrés dans le [fichier .nn](format_nn.md), avec le coût et l'optimiseur.
 
 ## Les deux graines
 
@@ -147,6 +148,3 @@ Pour vérifier les tests eux-mêmes, 30 erreurs ont été introduites volontaire
 
 Ces tests se lancent avec `make tests_run`.
 
-## Ce qui viendra
-
-Le learning rate variable ajoutera ses propres clés au format. Comme toute clé inconnue est refusée, elles ne sont pas encore acceptées.
