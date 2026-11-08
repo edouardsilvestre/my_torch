@@ -131,4 +131,4 @@ Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 81,8
 
 - **Un écart de 6,6 points** entre l'entraînement et la validation, contre 3,6 avec L2 seule et 10,5 sans régularisation. Les pas plus petits de la fin font mieux apprendre l'entraînement, et la validation progresse moins vite que lui. [Le dropout](dropout.md) réduit l'écart, mais fait aussi baisser la validation : il n'est pas utilisé.
 - **Des positions inconnues.** Les fichiers du correcteur ne sont pas exactement le dataset fourni : sa précision peut différer de celle mesurée ici.
-- **Le format aux niveaux simples.** Le réseau répond toujours avec les couleurs. Le premier essai suggère que le correcteur les accepte, mais ce n'est pas certain.
+- **Le format aux niveaux simples.** Le réseau répond toujours avec les couleurs. Le deuxième essai du correcteur a réussi les 3 tests de `Check` / `Nothing` avec ces réponses : il les accepte.

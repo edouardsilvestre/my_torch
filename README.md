@@ -138,6 +138,8 @@ save_network("xor.nn", network, loss, optimizer)
 
 | Sujet | Document |
 |---|---|
+| Les choix de conception et leurs résultats, en résumé | [docs/choix.md](docs/choix.md) |
+| L'architecture du module | [docs/architecture.md](docs/architecture.md) |
 | La backpropagation, expliquée et vérifiée | [docs/backpropagation.md](docs/backpropagation.md) |
 | Les optimiseurs : SGD, Momentum, Nesterov, RMSProp, Adam | [docs/optimiseurs.md](docs/optimiseurs.md) |
 | La boucle d'entraînement | [docs/entrainement.md](docs/entrainement.md) |
