@@ -44,6 +44,21 @@ def test_step_decay():
         1.0, 1.0, 0.5, 0.5, 0.25, 0.25, 0.125]
 
 
+def test_multistep_decay():
+    schedule = get_schedule("multistep", factor=0.5, milestones=[3, 5])
+    assert rates(schedule, 6) == [1.0, 1.0, 0.5, 0.5, 0.25, 0.25]
+
+
+def test_multistep_gives_the_rates_of_a_plateau_run():
+    # The learning rates of the plateau schedule, written down epoch by epoch, are those of a
+    # multistep schedule: a run with validation can be redone without it.
+    plateau = get_schedule("plateau", factor=0.5, patience=1, monitor="val_accuracy")
+    history = {"val_accuracy": [0.5, 0.6, 0.55, 0.7, 0.72, 0.71]}
+    planned = rates(plateau, 7, history)
+    assert planned == [1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.25]
+    assert rates(get_schedule("multistep", factor=0.5, milestones=[4, 7]), 7) == planned
+
+
 def test_exponential_decay():
     assert rates(get_schedule("exponential", factor=0.5), 4, base=0.1) == [
         0.1, 0.05, 0.025, 0.0125]
@@ -102,6 +117,10 @@ def test_plateau_does_not_raise_a_rate_already_below_its_minimum():
     ("plateau", {"patience": 0}, "patience must be a positive integer"),
     ("plateau", {"monitor": "val"}, "monitor must be one of"),
     ("plateau", {"minimum": float("inf")}, "minimum must be a non-negative number"),
+    ("multistep", {"milestones": []}, "milestones must be a non-empty list"),
+    ("multistep", {"milestones": [5, 5]}, "milestones must be increasing"),
+    ("multistep", {"milestones": [0]}, "each milestone must be a positive integer"),
+    ("multistep", {"milestones": 5}, "milestones must be a non-empty list"),
     ("warmup", {}, "unknown learning rate schedule 'warmup'"),
     ("step", {"gamma": 0.5}, "the step schedule has no parameter 'gamma'"),
 ])
@@ -222,6 +241,12 @@ def test_a_schedule_is_read_from_the_configuration(tmp_path):
     assert config.create_schedule().settings() == config.schedule
 
 
+def test_milestones_are_read_from_the_configuration(tmp_path):
+    config = load_config(write_config(
+        tmp_path, 'schedule = { name = "multistep", milestones = [17, 19] }'))
+    assert config.schedule == {"name": "multistep", "factor": 0.5, "milestones": [17, 19]}
+
+
 def test_a_schedule_can_be_a_sub_table(tmp_path):
     config = load_config(write_config(
         tmp_path, '[training.schedule]\nname = "plateau"\nmonitor = "loss"\npatience = 3'))
@@ -245,6 +270,12 @@ def test_without_schedule_the_learning_rate_is_fixed(tmp_path):
     ('schedule = { name = "step", factor = 2 }', "training.schedule: factor must be between"),
     ('schedule = { name = "plateau", monitor = "val" }', "training.schedule.monitor must be"),
     ('schedule = { name = "cosine", minimum = -1 }', "training.schedule: minimum must be"),
+    ('schedule = { name = "multistep", milestones = 3 }',
+     "training.schedule.milestones must be a list"),
+    ('schedule = { name = "multistep", milestones = [2, 0] }',
+     "training.schedule.milestones[1] must be a positive integer"),
+    ('schedule = { name = "multistep", milestones = [4, 2] }',
+     "training.schedule: milestones must be increasing"),
 ])
 def test_invalid_schedules_in_a_configuration(tmp_path, line, message):
     with pytest.raises(MyTorchError) as error:

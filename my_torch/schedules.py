@@ -66,6 +66,25 @@ class StepDecay(Schedule):
         return base * self.factor ** ((epoch - 1) // self.every)
 
 
+class MultiStepDecay(Schedule):
+    """Multiply the learning rate by factor at each epoch of milestones."""
+
+    name = "multistep"
+
+    def __init__(self, factor: float = 0.5, milestones: list[int] = [10]) -> None:
+        check_factor(factor)
+        if not isinstance(milestones, (list, tuple)) or not milestones:
+            raise MyTorchError(f"milestones must be a non-empty list of epochs, got {milestones!r}")
+        for milestone in milestones:
+            check_period("each milestone", milestone)
+        if any(later <= earlier for earlier, later in zip(milestones, milestones[1:])):
+            raise MyTorchError(f"milestones must be increasing, got {list(milestones)}")
+        self.factor, self.milestones = float(factor), [int(epoch) for epoch in milestones]
+
+    def learning_rate(self, base, epoch, epochs, history):
+        return base * self.factor ** sum(milestone <= epoch for milestone in self.milestones)
+
+
 class ExponentialDecay(Schedule):
     """Multiply the learning rate by factor at every epoch."""
 
@@ -142,7 +161,7 @@ class ReduceOnPlateau(Schedule):
 
 SCHEDULES: dict[str, type[Schedule]] = {
     schedule.name: schedule
-    for schedule in (StepDecay, ExponentialDecay, CosineAnnealing, ReduceOnPlateau)
+    for schedule in (StepDecay, MultiStepDecay, ExponentialDecay, CosineAnnealing, ReduceOnPlateau)
 }
 
 

@@ -217,6 +217,11 @@ def read_schedule(table: Any, where: str) -> dict[str, Any] | None:
             continue
         if accepted[key] is int:
             parameters[key] = read_count(value, f"{where}.{key}")
+        elif accepted[key] is list:
+            if not isinstance(value, list):
+                raise MyTorchError(f"{where}.{key} must be a list, got {value!r}")
+            parameters[key] = [read_count(item, f"{where}.{key}[{index}]")
+                               for index, item in enumerate(value)]
         elif accepted[key] is str:
             parameters[key] = read_name(value, f"{where}.{key}", dict.fromkeys(PLATEAU_MONITORED))
         else:
