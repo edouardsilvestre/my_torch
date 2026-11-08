@@ -65,6 +65,9 @@ def test_each_configuration_is_trained_and_measured(files, capsys):
     assert small["best_validation_accuracy"] == max(small["history"]["val_accuracy"])
     assert small["history"]["val_accuracy"][small["best_epoch"] - 1] == 1.0
     table = capsys.readouterr().out
+    # Each epoch is reported as it ends, to follow a long comparison.
+    assert table.count("\nepoch ") == 200
+    assert f"{files / 'small.conf'}:\nepoch   1/100 - loss " in table
     assert small["kept_epoch"] == 100
     assert small["train_accuracy"] == small["history"]["accuracy"][-1]
     assert "| small | 100 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |" in table

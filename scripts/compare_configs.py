@@ -43,7 +43,7 @@ def compare(config_path: Path, train_path: str, validation_path: str, cache: dic
     history = train(
         network, config.create_loss(), config.create_optimizer(), inputs, targets,
         config.epochs, config.batch_size, config.shuffle, config.training_seed,
-        validation=(validation_inputs, validation_targets), l2=config.l2,
+        validation=(validation_inputs, validation_targets), verbose=True, l2=config.l2,
         patience=config.patience, monitor=config.monitor,
     )
     seconds = time.perf_counter() - start
@@ -95,6 +95,7 @@ def main(argv: list[str]) -> None:
     arguments = parse_arguments(argv)
     results, cache = [], {}
     for config_path in arguments.configs:
+        print(f"{config_path}:", flush=True)
         try:
             result = compare(config_path, arguments.train, arguments.validation, cache)
         except (AnalyzerError, MyTorchError) as error:
