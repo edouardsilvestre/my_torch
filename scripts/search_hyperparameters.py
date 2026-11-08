@@ -27,11 +27,15 @@ from my_torch.config import parse_config
 from my_torch.search import Search, Trial, read_space
 from scripts.compare_configs import kept_epoch
 
-PARAMETERS = ("hidden", "activation", "dropout", "learning_rate", "batch_size", "l2")
+PARAMETERS = ("hidden", "activation", "dropout", "learning_rate", "batch_size", "l2",
+              "initializer", "optimizer", "schedule")
 
 
-def configuration(base: dict, params: dict[str, Any], epochs: int, patience: int) -> dict:
-    """The content of a configuration file: the base one, with the searched values."""
+def configuration(base: dict, params: dict[str, Any], epochs: int, patience: int | None) -> dict:
+    """The content of a configuration file: the base one, with the searched values.
+
+    optimizer replaces the whole [optimizer] table, like { name = "sgd", learning_rate = 0.1 };
+    learning_rate then changes its learning rate."""
     unknown = sorted(set(params) - set(PARAMETERS))
     if unknown:
         raise MyTorchError(f"unknown hyperparameter '{unknown[0]}', expected one of: "
@@ -48,7 +52,15 @@ def configuration(base: dict, params: dict[str, Any], epochs: int, patience: int
     for key in ("batch_size", "l2"):
         if key in params:
             training[key] = params[key]
-    training.update(epochs=epochs, patience=patience, monitor="val_accuracy")
+    training.update(epochs=epochs, monitor="val_accuracy")
+    if patience is not None:
+        training["patience"] = patience
+    if "schedule" in params:
+        training["schedule"] = params["schedule"]
+    if "initializer" in params:
+        data["network"]["initializer"] = params["initializer"]
+    if "optimizer" in params:
+        data["optimizer"] = dict(params["optimizer"])
     if "learning_rate" in params:
         data["optimizer"]["learning_rate"] = params["learning_rate"]
     return data

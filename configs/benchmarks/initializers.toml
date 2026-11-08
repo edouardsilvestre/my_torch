@@ -1,0 +1,8 @@
+# Benchmark des initialisations des poids (docs/benchmarks.md).
+title = "Initialisations"
+
+[variants]
+he = { initializer = "he" }
+xavier_uniform = { initializer = "xavier_uniform" }
+lecun = { initializer = "lecun" }
+normal = { initializer = "normal" }

@@ -1,0 +1,8 @@
+# Benchmark des activations des couches cachées (docs/benchmarks.md).
+title = "Activations"
+
+[variants]
+relu = { activation = "relu" }
+leaky_relu = { activation = "leaky_relu" }
+tanh = { activation = "tanh" }
+sigmoid = { activation = "sigmoid" }

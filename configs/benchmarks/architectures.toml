@@ -1,0 +1,9 @@
+# Benchmark des architectures du réseau d'échecs (docs/benchmarks.md).
+title = "Architectures (couches cachées)"
+
+[variants]
+"128" = { hidden = [128] }
+"256-64" = { hidden = [256, 64] }
+"256-256-64" = { hidden = [256, 256, 64] }
+"512-256-64" = { hidden = [512, 256, 64] }
+"256-256-256-64" = { hidden = [256, 256, 256, 64] }

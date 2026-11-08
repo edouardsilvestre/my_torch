@@ -61,4 +61,7 @@ Le C++ aurait été pertinent pour des opérations très petites et très nombre
 
 ## Vérification
 
-Ces affirmations seront mesurées dans les benchmarks : temps d'un produit matriciel NumPy comparé à une implémentation naïve, et temps d'entraînement par epoch selon la taille du batch.
+Ces affirmations sont mesurées dans [les benchmarks](benchmarks.md) :
+
+- **Le produit matriciel de la première couche,** 25 millions d'opérations, prend 871 ms avec une triple boucle en Python, et 0,24 ms avec NumPy : **environ 3 600 fois moins**. Sur un seul cœur, NumPy reste environ 1 300 fois plus rapide : l'essentiel vient de BLAS, pas du parallélisme.
+- **Le temps d'une epoch baisse quand le batch grandit :** sur 60 000 positions, 25,3 s avec des batchs de 32 et 6,8 s avec 256. Moins de pas, c'est moins de surcoût de l'interpréteur, et des produits plus grands, où BLAS est plus efficace.
