@@ -20,7 +20,7 @@ Le dépôt contient :
 
 ## Les résultats
 
-Le réseau poussé est entraîné sur les 723 019 positions du dataset fourni avec le sujet. Sur son jeu de **test**, 71 554 positions que le réseau n'a jamais vues :
+Le réseau poussé est entraîné sur le dataset fourni avec le sujet, 723 019 positions de vraies parties. Ses réglages ont été choisis sur une partie de validation, puis sa recette mesurée sur une partie de **test**, 71 554 positions jamais vues :
 
 | Niveau | Précision |
 |---|---|
@@ -28,7 +28,7 @@ Le réseau poussé est entraîné sur les 723 019 positions du dataset fourni av
 | `Checkmate` / `Check` / `Nothing` | **90,0 %** |
 | Avec les couleurs | **90,0 %** |
 
-Il trouve aussi les 5 positions de l'exemple du sujet. [Le document du réseau final](docs/reseau_final.md) explique comment il a été obtenu, et [les benchmarks](docs/benchmarks.md) comparent les choix possibles, graphiques à l'appui.
+Le réseau poussé est ensuite entraîné avec cette recette sur toutes les positions du dataset : il fait 95,98 % sur l'ensemble de `dataset.zip`. [Le document du réseau final](docs/reseau_final.md) explique comment il a été obtenu, et [les benchmarks](docs/benchmarks.md) comparent les choix possibles, graphiques à l'appui.
 
 ## Installation
 

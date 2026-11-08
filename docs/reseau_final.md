@@ -13,10 +13,10 @@ $> ./scripts/build_network.sh
 1. **Préparer le dataset fourni avec le sujet,** `dataset.zip`, qui doit se trouver à la racine du dépôt. Les 723 019 positions sont rassemblées dans `datasets/official.txt`, comme l'explique [le document sur les données](dataset.md).
 2. **Le découper,** avec la graine 0, en 572 449 positions d'entraînement, 71 556 de validation et 71 554 de test. Les 7 460 positions en double sont retirées avant le découpage.
 3. **Créer un réseau vierge** depuis [configs/my_torch_network.conf](../configs/my_torch_network.conf), avec `my_torch_generator`.
-4. **L'entraîner** sur le jeu d'entraînement avec `my_torch_analyzer --train`, en 19 epochs, avec une régularisation L2 de 1e-4 et un learning rate divisé par 2 avant les epochs 17 et 19.
+4. **L'entraîner** avec `my_torch_analyzer --train`, en 19 epochs, avec une régularisation L2 de 1e-4 et un learning rate divisé par 2 avant les epochs 17 et 19, sur **toutes** les positions : entraînement, validation et test réunis, comme l'explique [l'entraînement final](#lentraînement-final-sur-tout-le-dataset). `TRAIN_ON=train ./scripts/build_network.sh` n'entraîne que sur le jeu d'entraînement, pour mesurer la recette sur des positions jamais vues.
 5. **L'évaluer** sur la validation, puis sur le test.
 
-L'ensemble prend environ 1 h 30 sur notre machine. Toutes les graines sont fixées, donc relancer le script redonne le même réseau. Le sujet exige de garder tous les scripts d'entraînement. `dataset.zip` n'est pas poussé : tout le monde le reçoit avec le sujet, et le sujet n'impose pas de pousser les datasets.
+L'ensemble prend environ 2 h sur notre machine. Toutes les graines sont fixées, donc relancer le script redonne le même réseau. Le sujet exige de garder tous les scripts d'entraînement. `dataset.zip` n'est pas poussé : tout le monde le reçoit avec le sujet, et le sujet n'impose pas de pousser les datasets.
 
 ## Pourquoi le dataset fourni
 
@@ -90,7 +90,7 @@ Comme toutes les graines sont fixées, il est identique au réseau gardé par l'
 
 ## Ce qu'il vaut
 
-Sur le **jeu de test du dataset fourni**, 71 554 positions que le réseau n'a jamais vues, avec la répartition du dataset (41,6 % de `Nothing`, 34,7 % d'échecs, 23,7 % de mats) :
+Ces mesures sont celles de la recette, entraînée sur le seul jeu d'entraînement (`TRAIN_ON=train`). Sur le **jeu de test du dataset fourni**, 71 554 positions que ce réseau n'a jamais vues, avec la répartition du dataset (41,6 % de `Nothing`, 34,7 % d'échecs, 23,7 % de mats) :
 
 | Niveau du correcteur | Première version | Dataset fourni, sans L2 | Avec L2 | Ce réseau, L2 et learning rate planifié |
 |---|---|---|---|---|
@@ -115,6 +115,19 @@ Sur le **jeu de test du dataset fourni**, 71 554 positions que le réseau n'a ja
 Sur nos 10 000 positions de test aléatoires, ce réseau fait aussi mieux : 81,8 % avec les couleurs, contre 80,7 % avec L2 seule, 74,1 % sans L2 et 71,8 % pour la première version.
 
 **Sur les 5 positions de l'exemple du sujet,** il les trouve toutes les 5, comme la première version. Le réseau sans L2 n'en trouvait que 3, et celui avec L2 seule 4. Ces 5 positions pèsent peu face aux 71 554 du jeu de test, mais elles montrent que des erreurs restent possibles sur des positions simples.
+
+## L'entraînement final sur tout le dataset
+
+Les réglages ont tous été choisis sur la validation, et la recette mesurée sur le test. Le réseau poussé est ensuite entraîné avec cette même recette sur **les 715 559 positions** du dataset fourni, au lieu des 572 449 du seul jeu d'entraînement : 25 % de positions en plus. C'est l'usage une fois les réglages fixés, puisque la validation et le test ne servent plus à rien choisir.
+
+| Réseau | Positions vues | Sur tout `dataset.zip`, avec les couleurs | `Check` / `Nothing` |
+|---|---|---|---|
+| La recette, entraînée sur le jeu d'entraînement | 572 449 | 95,36 % | 98,34 % |
+| **Le réseau poussé, entraîné sur tout le dataset** | 715 559 | **95,98 %** | **98,82 %** |
+
+**Le défaut :** il n'existe plus de positions du dataset fourni que ce réseau n'a jamais vues, donc plus de mesure honnête de sa précision sur des positions nouvelles. On s'attend à ce qu'elle soit au moins celle de la recette, 90,0 % avec les couleurs, puisqu'il a vu plus de positions. Le tester du sujet, sur ses propres positions, reste la seule mesure indépendante.
+
+Sur les 5 positions de l'exemple du sujet, ce réseau en trouve 4 : il prend le mat du fou pour `Check Black`.
 
 ## Le fichier poussé
 
