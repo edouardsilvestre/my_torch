@@ -158,6 +158,8 @@ class Search:
         self.space, self.evaluate, self.on_trial = space, evaluate, on_trial
         self.trials: list[Trial] = []
         self.scores: dict[str, float] = {}
+        # Scores of the members of each generation of the genetic search, in order.
+        self.generations: list[list[float]] = []
 
     def score(self, params: dict[str, Any], method: str, generation: int | None = None) -> float:
         key = json.dumps(params, sort_keys=True)
@@ -215,6 +217,7 @@ class Search:
         members = [sample(self.space, rng) for _ in range(population)]
         for generation in range(1, generations + 1):
             scores = [self.score(member, "genetic", generation) for member in members]
+            self.generations.append(scores)
             if generation == generations:
                 break
             order = sorted(range(population), key=lambda index: -scores[index])
