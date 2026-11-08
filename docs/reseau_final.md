@@ -129,6 +129,40 @@ Les réglages ont tous été choisis sur la validation, et la recette mesurée s
 
 Sur les 5 positions de l'exemple du sujet, ce réseau en trouve 4 : il prend le mat du fou pour `Check Black`.
 
+## Les symétries de l'échiquier
+
+Deux transformations ne changent jamais l'état d'une position :
+
+- **le miroir de la colonne a à la colonne h :** une attaque reste une attaque, et une parade une parade. Le roque est la seule règle asymétrique, et il ne permet jamais de sortir d'un échec : les droits de roque sont simplement retirés ;
+- **l'inversion des couleurs :** l'échiquier est retourné, les pièces blanches deviennent noires, et c'est l'autre camp qui joue. Un échec des blancs devient un échec des noirs.
+
+Chaque position en donne donc quatre, dont le label est connu exactement. [scripts/augment_dataset.py](../scripts/augment_dataset.py) les écrit, et revérifie un échantillon avec nos propres règles des échecs : sur 20 000 positions vérifiées, toutes ont le bon label.
+
+**La mesure, sur des positions jamais vues.** Le réseau de la recette, entraîné sur le jeu d'entraînement, a été entraîné plus loin sur ce jeu multiplié par 4, avec le petit learning rate de sa fin, 0,00025 :
+
+| Réseau | Validation, avec les couleurs |
+|---|---|
+| La recette | 90,06 % |
+| + 1 epoch sur les symétries | 91,59 % |
+| + 2 epochs sur les symétries | **91,84 %** |
+
+Les symétries apportent près de 2 points : le réseau voit chaque motif d'attaque dans ses quatre orientations, et apprend ce qui ne dépend pas du côté de l'échiquier.
+
+**Appliquées au réseau entraîné sur tout le dataset,** 2 epochs sur les 2 862 236 positions de tout le dataset multiplié par 4, avec [configs/finetune/symmetries_all.toml](../configs/finetune/symmetries_all.toml), elles donnent un réseau qui trouve les 5 positions de l'exemple du sujet, mais qui ne fait plus que **93,51 %** sur l'ensemble de `dataset.zip`, contre 95,98 % avant. Les positions d'origine ne sont plus qu'un quart de ce qu'il voit : il les retient moins, et généralise mieux.
+
+**Ce réseau n'est pas poussé.** Le correcteur a donné **10 tests sur 10** au réseau entraîné sur tout le dataset, sans les symétries : c'est lui qui reste. Ce résultat suggère que les positions du correcteur ressemblent beaucoup à celles du dataset fourni. Les symétries restent la meilleure piste pour des positions vraiment nouvelles.
+
+## Ce qu'en dit le correcteur
+
+| Essai | Réseau | Tests réussis |
+|---|---|---|
+| 1 | Entraîné sur nos parties aléatoires | 2 / 10 |
+| 2 | Entraîné sur le dataset fourni, 10 epochs | 8 / 10 |
+| 3 | + L2, early stopping et learning rate planifié | 8 / 10 |
+| 4 | **La même recette, entraînée sur tout le dataset fourni** | **10 / 10** |
+
+Les essais 2 et 3 échouaient au seul niveau « High » de `Full` et `Full + color`.
+
 ## Le fichier poussé
 
 `my_torch_network.nn` pèse 6,7 Mo. Il contient le réseau, `769 → 256 → 256 → 64 → 5`, mais aussi le coût, l'optimiseur Adam avec sa mémoire, et les réglages d'entraînement. `my_torch_analyzer --train` peut donc continuer à l'entraîner.

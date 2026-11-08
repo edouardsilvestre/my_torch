@@ -15,7 +15,7 @@ Précision sur le **jeu de test** du dataset fourni, 71 554 positions jamais vue
 
 Chaque étape n'a été retenue qu'après avoir amélioré la **validation**. Le jeu de test n'a servi qu'à ces mesures finales, jamais à choisir.
 
-Une fois la recette fixée, le réseau poussé est entraîné sur **tout** le dataset fourni, validation et test compris : 95,98 % sur l'ensemble de `dataset.zip`, contre 95,36 % pour la recette entraînée sur le seul jeu d'entraînement. Voir [l'entraînement final](reseau_final.md#lentraînement-final-sur-tout-le-dataset).
+Une fois la recette fixée, le réseau poussé est entraîné sur **tout** le dataset fourni, validation et test compris : 95,98 % sur l'ensemble de `dataset.zip`, contre 95,36 % pour la recette entraînée sur le seul jeu d'entraînement. Voir [l'entraînement final](reseau_final.md#lentraînement-final-sur-tout-le-dataset). Avec ce réseau, le correcteur donne **10 tests sur 10**, contre 8 sur 10 aux deux réseaux précédents.
 
 ## Le module
 

@@ -28,7 +28,7 @@ Le réseau poussé est entraîné sur le dataset fourni avec le sujet, 723 019 p
 | `Checkmate` / `Check` / `Nothing` | **90,0 %** |
 | Avec les couleurs | **90,0 %** |
 
-Le réseau poussé est ensuite entraîné avec cette recette sur toutes les positions du dataset : il fait 95,98 % sur l'ensemble de `dataset.zip`. [Le document du réseau final](docs/reseau_final.md) explique comment il a été obtenu, et [les benchmarks](docs/benchmarks.md) comparent les choix possibles, graphiques à l'appui.
+Le réseau poussé est ensuite entraîné avec cette recette sur toutes les positions du dataset : il fait 95,98 % sur l'ensemble de `dataset.zip`, et réussit les **10 tests sur 10** du correcteur. [Le document du réseau final](docs/reseau_final.md) explique comment il a été obtenu, et [les benchmarks](docs/benchmarks.md) comparent les choix possibles, graphiques à l'appui.
 
 ## Installation
 
