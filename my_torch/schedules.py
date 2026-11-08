@@ -159,6 +159,14 @@ def get_schedule(name: str, **parameters) -> Schedule:
     return SCHEDULES[name](**parameters)
 
 
+def schedule_from_settings(settings: dict | None) -> Schedule | None:
+    """Create the schedule described by saved settings, {"name": ..., parameters}."""
+    if settings is None:
+        return None
+    parameters = dict(settings)
+    return get_schedule(parameters.pop("name"), **parameters)
+
+
 def schedule_parameters(name: str) -> dict[str, type]:
     """Return the parameters of a schedule, with the type of their default."""
     signature = inspect.signature(SCHEDULES[name].__init__)

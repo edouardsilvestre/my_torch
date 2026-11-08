@@ -27,7 +27,7 @@ EXPECTED = {
 }
 SETTINGS = {"epochs": 100, "batch_size": 5, "shuffle": True, "seed": 0}
 CHECKED_SETTINGS = {**SETTINGS, "l2": 0.0, "patience": None, "monitor": "val_loss",
-                    "validation_split": 0.0}
+                    "validation_split": 0.0, "schedule": None}
 
 
 def save_trainable(path, outputs=5, settings=SETTINGS):

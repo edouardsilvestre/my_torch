@@ -12,6 +12,10 @@ from my_torch.initializers import INITIALIZERS
 from my_torch.losses import LOSSES, Loss, get_loss
 from my_torch.network import Network
 from my_torch.optimizers import OPTIMIZERS, Optimizer, get_optimizer
+from my_torch.schedules import (
+    PLATEAU_MONITORED, SCHEDULES, Schedule, get_schedule, schedule_from_settings,
+    schedule_parameters,
+)
 from my_torch.training import MONITORED
 
 DEFAULT_INITIALIZER = "he"
@@ -39,6 +43,7 @@ class Config:
     monitor: str = DEFAULT_MONITOR
     validation_split: float = 0.0
     dropout: list[float] | None = None
+    schedule: dict[str, Any] | None = None
 
     def create_network(self, seed: int | None = None) -> Network:
         """Create a blank network, with the seed of the configuration unless another is given."""
@@ -54,6 +59,10 @@ class Config:
         """Create a new optimizer: each network needs its own."""
         return get_optimizer(self.optimizer, **self.optimizer_params)
 
+    def create_schedule(self) -> Schedule | None:
+        """Create the learning rate schedule, or None for a fixed learning rate."""
+        return schedule_from_settings(self.schedule)
+
     def training_settings(self) -> dict[str, Any]:
         """Return the training settings to save with the network."""
         return {
@@ -65,6 +74,7 @@ class Config:
             "patience": self.patience,
             "monitor": self.monitor,
             "validation_split": self.validation_split,
+            "schedule": self.schedule,
         }
 
 
@@ -160,7 +170,7 @@ def read_network(
 
 def read_training(table: Any, where: str = "training", with_loss: bool = True) -> dict[str, Any]:
     required = {"epochs", "batch_size"} | ({"loss"} if with_loss else set())
-    optional = {"shuffle", "seed", "l2", "patience", "monitor", "validation_split"}
+    optional = {"shuffle", "seed", "l2", "patience", "monitor", "validation_split", "schedule"}
     check_keys(table, where, required, optional)
     patience = table.get("patience")
     training = {
@@ -176,6 +186,7 @@ def read_training(table: Any, where: str = "training", with_loss: bool = True) -
         "validation_split": read_number(
             table.get("validation_split", 0.0), f"{where}.validation_split"
         ),
+        "schedule": read_schedule(table.get("schedule"), f"{where}.schedule"),
     }
     if training["l2"] < 0:
         raise MyTorchError(f"{where}.l2 must not be negative, got {training['l2']}")
@@ -186,6 +197,34 @@ def read_training(table: Any, where: str = "training", with_loss: bool = True) -
     if with_loss:
         training["loss"] = read_name(table["loss"], f"{where}.loss", LOSSES)
     return training
+
+
+def read_schedule(table: Any, where: str) -> dict[str, Any] | None:
+    """Read a learning rate schedule, { name = "step", factor = 0.5, every = 10 }, and return
+    its settings with every parameter, the defaults included."""
+    if table is None:
+        return None
+    if not isinstance(table, dict):
+        raise MyTorchError(f"{where} must be a table, like {{ name = \"step\", every = 10 }}")
+    if "name" not in table:
+        raise MyTorchError(f"{where}: missing key 'name'")
+    name = read_name(table["name"], f"{where}.name", SCHEDULES)
+    accepted = schedule_parameters(name)
+    check_keys(table, where, {"name"}, set(accepted))
+    parameters = {}
+    for key, value in table.items():
+        if key == "name":
+            continue
+        if accepted[key] is int:
+            parameters[key] = read_count(value, f"{where}.{key}")
+        elif accepted[key] is str:
+            parameters[key] = read_name(value, f"{where}.{key}", dict.fromkeys(PLATEAU_MONITORED))
+        else:
+            parameters[key] = read_number(value, f"{where}.{key}")
+    try:
+        return get_schedule(name, **parameters).settings()
+    except MyTorchError as error:
+        raise MyTorchError(f"{where}: {error}") from error
 
 
 def check_training_settings(settings: Any) -> dict[str, Any]:
@@ -230,7 +269,7 @@ def parse_config(data: Any) -> Config:
         input_size, layers, initializer, seed, training["loss"], optimizer, optimizer_params,
         training["epochs"], training["batch_size"], training["shuffle"], training["seed"],
         training["l2"], training["patience"], training["monitor"], training["validation_split"],
-        dropout,
+        dropout, training["schedule"],
     )
 
 
